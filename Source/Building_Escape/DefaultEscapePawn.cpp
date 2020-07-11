@@ -4,7 +4,7 @@
 #include "DefaultEscapePawn.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
@@ -54,13 +54,13 @@ ADefaultEscapePawn::ADefaultEscapePawn(const FObjectInitializer& ObjectInitializ
 
 	static FConstructorStatics ConstructorStatics;
 
-	MeshComponent = CreateOptionalDefaultSubobject<UStaticMeshComponent>(ADefaultEscapePawn::MeshComponentName);
+	MeshComponent = ObjectInitializer.CreateDefaultSubobject<USkeletalMeshComponent>(this, ADefaultEscapePawn::MeshComponentName);
 	if (MeshComponent)
 	{
-		MeshComponent->SetStaticMesh(ConstructorStatics.SphereMesh.Object);
+		//MeshComponent->CreateDefaultSubobject<USkeletalMesh>(ADefaultEscapePawn::MeshComponentName);
 		MeshComponent->AlwaysLoadOnClient = true;
 		MeshComponent->AlwaysLoadOnServer = true;
-		MeshComponent->bOwnerNoSee = true;
+		//MeshComponent->bOwnerNoSee = true;
 		MeshComponent->bCastDynamicShadow = true;
 		MeshComponent->bAffectDynamicIndirectLighting = false;
 		MeshComponent->bAffectDistanceFieldLighting = false;

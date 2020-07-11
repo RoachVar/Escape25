@@ -15,7 +15,7 @@
 class UInputComponent;
 class UPawnMovementComponent;
 class UCapsuleComponent;
-class UStaticMeshComponent;
+class USkeletalMeshComponent;
 
 UENUM(BlueprintType)
 enum EPawnMovementState
@@ -131,8 +131,8 @@ public:
 
 private:
 	/** The mesh associated with this Pawn. */
-	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-		UStaticMeshComponent* MeshComponent;
+	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+		USkeletalMeshComponent* MeshComponent;
 public:
 
 	/** If true, adds default input bindings for movement and camera look. */
@@ -142,6 +142,6 @@ public:
 	/** Returns CollisionComponent subobject **/
 	UCapsuleComponent* GetCollisionComponent() const { return CollisionComponent; }
 	/** Returns MeshComponent subobject **/
-	UStaticMeshComponent* GetMeshComponent() const { return MeshComponent; }
+	USkeletalMeshComponent* GetMeshComponent() const { return MeshComponent; }
 };
 
