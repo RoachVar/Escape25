@@ -111,6 +111,12 @@ bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRot
 		return false;
 	};
 
+	if (LineTraceHitResult.GetComponent()->IsSimulatingPhysics())
+	{
+		//Component simulates physics - not suitable for attachment
+		return false;
+	}
+
 	//Calculating hang location and rotation based on hit location and hit normal
 	FRotator AdjustedRotation = (UKismetMathLibrary::FindLookAtRotation(FVector(0, 0, 0), LineTraceHitResult.ImpactNormal)) + FRotator(0,180,0);
 	FVector AdjustedLocation = LineTraceHitResult.ImpactPoint + AdjustedRotation.RotateVector(FVector(-1 * AttachDistance, 0, 0));
