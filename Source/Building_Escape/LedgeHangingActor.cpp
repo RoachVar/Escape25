@@ -85,7 +85,7 @@ void ALedgeHangingActor::UpdateEdgeStatuses()
 	}
 }
 
-bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation)
+bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const
 {
 	//Declaring variables needed for tracubg
 	FVector AttachTraceStart = InOriginLocation + InOriginRotation.RotateVector(FVector(-CapsuleRadius, 0, GrabHeight - HandSize.Z - 3));
@@ -221,7 +221,7 @@ bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRot
 	return true;
 }
 
-bool ALedgeHangingActor::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform &OutTransform)
+bool ALedgeHangingActor::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform &OutTransform) const
 {
 	FRotator OffsetRotation = GetActorRotation() + FRotator(0, bIsEdgeToTheRight != bTestForOuterEdge ? 90 : -90, 0);
 	float XOffset = (bTestForOuterEdge ? 3 : -1) * CapsuleRadius;
@@ -335,7 +335,7 @@ void ALedgeHangingActor::AdjustmentEnded()
 	ChangeHangingState(Hanging);
 }
 
-void ALedgeHangingActor::TogglePlaneLock(bool bNewIsLocked)
+void ALedgeHangingActor::TogglePlaneLock(bool bNewIsLocked) const
 {
 	if (bNewIsLocked)
 	{

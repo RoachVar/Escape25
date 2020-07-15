@@ -83,10 +83,10 @@ private:
 	FTransform RightEdgeTargetTransform;
 	
 	// Performs several traces that verify if the location and rotation passed can be projected to a fully valid hanging spot. The out parameters are only assigned when the function returns true
-	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation);
+	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const;
 	
 	// This function locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
-	void TogglePlaneLock(bool bNewIsLocked);
+	void TogglePlaneLock(bool bNewIsLocked) const;
 
 	// This value signifies which procedure that forms the hanging system is currently underway. It should be assigned only using the function below
 	TEnumAsByte<EHangingState> CurrentHangingState;
@@ -98,7 +98,7 @@ private:
 	void UpdateEdgeStatuses();
 	
 	//Triggers IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true
-	bool TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform& OutTransform);
+	bool TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform& OutTransform) const;
 	
 	// Collider boxes are spawned to represent an interaction with an edge - they act as blocking volumes when the edge is non-traversable and as triggers if a corner transition is expected
 	void SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform);
