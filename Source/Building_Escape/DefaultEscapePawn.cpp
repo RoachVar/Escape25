@@ -10,7 +10,7 @@
 #include "Engine/StaticMesh.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
-#include "GameFramework/FloatingPawnMovement.h"
+#include "Components/ParkourMovementComponent.h"
 #include "GameFramework/PlayerInput.h"
 
 FName ADefaultEscapePawn::MovementComponentName(TEXT("MovementComponent0"));
@@ -41,7 +41,7 @@ ADefaultEscapePawn::ADefaultEscapePawn(const FObjectInitializer& ObjectInitializ
 
 	RootComponent = CollisionComponent;
 
-	MovementComponent = CreateDefaultSubobject<UPawnMovementComponent, UFloatingPawnMovement>(ADefaultEscapePawn::MovementComponentName);
+	MovementComponent = CreateDefaultSubobject<UPawnMovementComponent, UParkourMovementComponent>(ADefaultEscapePawn::MovementComponentName);
 	MovementComponent->UpdatedComponent = CollisionComponent;
 
 	// Structure to hold one-time initialization

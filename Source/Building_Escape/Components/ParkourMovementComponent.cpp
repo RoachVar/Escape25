@@ -1,7 +1,7 @@
 // Copyright Roch Karwacki 2020
 
 
-#include "LedgeHangingActor.h"
+#include "ParkourMovementComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameFramework/PawnMovementComponent.h"
@@ -11,28 +11,29 @@
 #include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
-ALedgeHangingActor::ALedgeHangingActor()
-{
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false;
-}
+//UParkourMovementComponent::UParkourMovementComponent()
+//{
+// 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+//	PrimaryComponentTick.bCanEverTick = true;
+//	PrimaryComponentTick.bStartWithTickEnabled = true;
+//}
 
 // Called when the game starts or when spawned
-void ALedgeHangingActor::BeginPlay()
+void UParkourMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	SetActorTickEnabled(false);
-	PawnsRootPrimitive = (UCapsuleComponent*)(GetAttachParentActor()->GetRootComponent());
-	PawnsMovementComponent = (UPawnMovementComponent*)GetAttachParentActor()->GetComponentByClass(UPawnMovementComponent::StaticClass());
+	SetComponentTickEnabled(true);
+	PawnsRootPrimitive = (UCapsuleComponent*)(GetOwner()->GetRootComponent());
+	PawnsMovementComponent = (UPawnMovementComponent*)GetOwner()->GetComponentByClass(UPawnMovementComponent::StaticClass());
 	PawnsRootPrimitive->GetUnscaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
 }
 
 // Called every frame
-void ALedgeHangingActor::Tick(float DeltaTime)
+void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-	Super::Tick(DeltaTime);
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (CurrentHangingState != Hanging) { return; }
 	//Setting current velocity to the precisely the value of movement input, effectively nullifying outside influence without having to disable physics simulation(which causes bugs)
 	PawnsRootPrimitive->SetAllPhysicsLinearVelocity(PawnsMovementComponent->GetLastInputVector());
 	//Checking if the player is currently on either edge of the current plane. If so, a collider box that enforces appropriate behaviour(blocking or traversing a corner) will be spawned
@@ -40,7 +41,7 @@ void ALedgeHangingActor::Tick(float DeltaTime)
 
 }
 
-void ALedgeHangingActor::UpdateEdgeStatuses()
+void UParkourMovementComponent::UpdateEdgeStatuses()
 {
 	//The loop executes exactly two times (index 0 for left side, index 1 for right side)
 	for (int Iteration = 0; Iteration <= 1; Iteration++)
@@ -62,8 +63,8 @@ void ALedgeHangingActor::UpdateEdgeStatuses()
 		FVector OutVector;
 		FRotator OutRotator;
 		float HorizontalOffset = Direction * CapsuleRadius/2;
-		FVector TestedHangLocation = GetActorLocation() + GetActorRotation().RotateVector(FVector(0, HorizontalOffset, 0));
-		if (IsValidHangPoint(OUT OutVector,OUT OutRotator, TestedHangLocation, GetActorRotation()))
+		FVector TestedHangLocation = GetActorLocation() + GetOwner()->GetActorRotation().RotateVector(FVector(0, HorizontalOffset, 0));
+		if (IsValidHangPoint(OUT OutVector,OUT OutRotator, TestedHangLocation, GetOwner()->GetActorRotation()))
 		{ continue;	}
 		//Initialising a variable that refers to the pointer of the aproppriate transform variable depending on the direction;
 		FTransform * TestedCornerTargetTransform = &(bTestRight ? RightEdgeTargetTransform : LeftEdgeTargetTransform);
@@ -80,19 +81,19 @@ void ALedgeHangingActor::UpdateEdgeStatuses()
 		}
 		
 		//A collider is spawned to the right or left of the player one capsule radius away
-		FVector CollisionBoxLocation = GetActorLocation() + GetActorRotation().RotateVector(FVector(0, Direction * CapsuleRadius, 0));
-		SpawnEdgeCollider(bTestRight, FTransform(GetActorRotation(), CollisionBoxLocation, FVector(1,1,1)));
+		FVector CollisionBoxLocation = GetActorLocation() + GetOwner()->GetActorRotation().RotateVector(FVector(0, Direction * CapsuleRadius, 0));
+		SpawnEdgeCollider(bTestRight, FTransform(GetOwner()->GetActorRotation(), CollisionBoxLocation, FVector(1,1,1)));
 	}
 }
 
-bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const
+bool UParkourMovementComponent::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const
 {
 	//Declaring variables needed for tracubg
 	FVector AttachTraceStart = InOriginLocation + InOriginRotation.RotateVector(FVector(-CapsuleRadius, 0, GrabHeight - HandSize.Z - 3));
 	FVector AttachTraceEnd = AttachTraceStart + InOriginRotation.RotateVector(FVector(GrabbingReach + 1 + CapsuleRadius, 0,0));
 	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
 	TraceParams.bFindInitialOverlaps = false;
-	TraceParams.AddIgnoredActor(GetAttachParentActor());
+	TraceParams.AddIgnoredActor(GetOwner());
 	FHitResult LineTraceHitResult;
 
 	//Performing a trace that seeks for a surface that could support a hanging player
@@ -221,12 +222,12 @@ bool ALedgeHangingActor::IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRot
 	return true;
 }
 
-bool ALedgeHangingActor::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform &OutTransform) const
+bool UParkourMovementComponent::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform &OutTransform) const
 {
-	FRotator OffsetRotation = GetActorRotation() + FRotator(0, bIsEdgeToTheRight != bTestForOuterEdge ? 90 : -90, 0);
+	FRotator OffsetRotation = GetOwner()->GetActorRotation() + FRotator(0, bIsEdgeToTheRight != bTestForOuterEdge ? 90 : -90, 0);
 	float XOffset = (bTestForOuterEdge ? 3 : -1) * CapsuleRadius;
 	float YOffset = bTestForOuterEdge ? (bIsEdgeToTheRight ? 1 : -1) * CapsuleRadius : 0;
-	FVector OffsetLocation = GetActorRotation().RotateVector(FVector(XOffset, YOffset, 0)) + GetActorLocation();
+	FVector OffsetLocation = GetOwner()->GetActorRotation().RotateVector(FVector(XOffset, YOffset, 0)) + GetActorLocation();
 
 	FVector HangLocation(0, 0, 0);
 	FRotator HangRotation(0, 0, 0);
@@ -244,11 +245,11 @@ bool ALedgeHangingActor::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestFor
 }
 
 
-bool ALedgeHangingActor::TryToHangInCurrentLocation()
+bool UParkourMovementComponent::TryToHangInCurrentLocation()
 {
 	FVector HangLocation(0, 0, 0);
 	FRotator HangRotation(0, 0, 0);
-	bool bCanHang = IsValidHangPoint(OUT HangLocation, OUT HangRotation, GetActorLocation(), GetActorRotation());
+	bool bCanHang = IsValidHangPoint(OUT HangLocation, OUT HangRotation, GetActorLocation(), GetOwner()->GetActorRotation());
 
 	if (bCanHang)
 	{
@@ -262,7 +263,7 @@ bool ALedgeHangingActor::TryToHangInCurrentLocation()
 		return false;
 	}
 }
-void ALedgeHangingActor::SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight)
+void UParkourMovementComponent::SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight)
 {
 	HandSize = NewHandSize;
 	GrabHeight = NewGrabHeight;
@@ -270,24 +271,36 @@ void ALedgeHangingActor::SetParameters(FVector NewHandSize, float NewGrabHeight,
 	AttachDistance = NewAttachDistance;
 	AttachHeight = NewAttachHeight;
 }
-void ALedgeHangingActor::AdjustLocationToHangPosition_Implementation(FVector HangLocation, FRotator HangRotation)
+void UParkourMovementComponent::AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation)
 {
-	if (GetAttachParentActor())
+	if (LocationAdjustment.IsBound())
 	{
-		GetAttachParentActor()->SetActorLocation(HangLocation);
-		GetAttachParentActor()-> SetActorRotation(HangRotation);
+		LocationAdjustment.Broadcast(HangLocation, HangRotation);
+
+	}
+	else
+	{
+		GetOwner()->SetActorLocation(HangLocation);
+		GetOwner()->SetActorRotation(HangRotation);
 		AdjustmentEnded();
 	}
-	return;
 }
 
-void ALedgeHangingActor::AdjustLocationAroundCorner_Implementation(FVector HangLocation, FRotator HangRotation)
+void UParkourMovementComponent::AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation)
 {
-	AdjustLocationToHangPosition_Implementation(HangLocation, HangRotation);
-	return;
+	if (CornerAdjustment.IsBound())
+	{
+		CornerAdjustment.Broadcast(HangLocation, HangRotation);
+	}
+	else
+	{
+		GetOwner()->SetActorLocation(HangLocation);
+		GetOwner()->SetActorRotation(HangRotation);
+		AdjustmentEnded();
+	}
 }
 
-void ALedgeHangingActor::ChangeHangingState(TEnumAsByte<EHangingState> NewHangingState)
+void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> NewHangingState)
 {
 	//If the current state is already equal to the one passed in, an early return is triggered; function execution ceases
 	if (CurrentHangingState == NewHangingState) { return; }
@@ -307,39 +320,35 @@ void ALedgeHangingActor::ChangeHangingState(TEnumAsByte<EHangingState> NewHangin
 	//Futher processes are carried out depending on what the new state is
 	switch (CurrentHangingState) {
 	case NotHanging:
-		SetActorTickEnabled(false);
 		TogglePlaneLock(false);
 		PawnsRootPrimitive->SetEnableGravity(true);
 		Reset();
 		break;
 	case AdjustingLocation:
-		SetActorTickEnabled(false);
-		GetAttachParentActor()->DisableInput(GetWorld()->GetFirstPlayerController());
+		GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
 		PawnsRootPrimitive->SetEnableGravity(false);
 		PawnsRootPrimitive->SetAllPhysicsLinearVelocity(FVector(0, 0, 0));
 	case TraversingACorner:
-		SetActorTickEnabled(false);
 		Reset();
 		break;
 	case Hanging:
 		TogglePlaneLock(true);
-		SetActorTickEnabled(true);
-		GetAttachParentActor()->EnableInput(GetWorld()->GetFirstPlayerController());
+		GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
 		break;
 	
 	}
 }
 
-void ALedgeHangingActor::AdjustmentEnded()
+void UParkourMovementComponent::AdjustmentEnded()
 {
 	ChangeHangingState(Hanging);
 }
 
-void ALedgeHangingActor::TogglePlaneLock(bool bNewIsLocked) const
+void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) const
 {
 	if (bNewIsLocked)
 	{
-		PawnsMovementComponent->SetPlaneConstraintFromVectors(FRotator(0,90,9).RotateVector(GetAttachParentActor()->GetActorForwardVector()), FVector(0, 0, 1));
+		PawnsMovementComponent->SetPlaneConstraintFromVectors(FRotator(0,90,9).RotateVector(GetOwner()->GetActorForwardVector()), FVector(0, 0, 1));
 		PawnsMovementComponent->SetPlaneConstraintEnabled(true);
 		PawnsRootPrimitive->SetConstraintMode(EDOFMode::XYPlane);
 	}
@@ -350,12 +359,12 @@ void ALedgeHangingActor::TogglePlaneLock(bool bNewIsLocked) const
 	}
 }
 
-void ALedgeHangingActor::FinishHang()
+void UParkourMovementComponent::FinishHang()
 {
 	ChangeHangingState(NotHanging);
 }
 
-void ALedgeHangingActor::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform)
+void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform)
 {
 	//Creating a collider and setting its extent
 	UBoxComponent * NewColliderObject = NewObject<UBoxComponent>(this);
@@ -371,7 +380,7 @@ void ALedgeHangingActor::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTr
 	}
 	else
 	{
-		NewColliderObject->OnComponentBeginOverlap.AddDynamic(this, &ALedgeHangingActor::EdgeOverlapBegin);
+		NewColliderObject->OnComponentBeginOverlap.AddDynamic(this, &UParkourMovementComponent::EdgeOverlapBegin);
 	}
 	
 	//Registering the component and assigning it to the pointer depending on the bool that was passed into this function(that signifies which edge this collision will represent)
@@ -379,10 +388,10 @@ void ALedgeHangingActor::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTr
 	(bIsRightEdge ? RightCollider : LeftCollider) = NewColliderObject;
 }
 
-void ALedgeHangingActor::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	//If the actor that collided with the collision box isn't the pawn that owns the LedgeHangingActor, this collision event is irrelevant; returning immediately.
-	if (OtherActor != GetAttachParentActor()) { return; }
+	if (OtherActor != GetOwner()) { return; }
 	
 	//Declaring a pointer to the correct TargetTransform variable depending on which edge the collider that caused this event represents
 	FTransform * TargetTransform = (OverlappedComp == LeftCollider) ? &LeftEdgeTargetTransform : &RightEdgeTargetTransform;
@@ -392,7 +401,7 @@ void ALedgeHangingActor::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedC
 	AdjustLocationAroundCorner(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator());
 }
 
-void ALedgeHangingActor::Reset()
+void UParkourMovementComponent::Reset()
 {
 	//Setting edge status enums to the default statE
 	LeftEdgeState = Unknown;
@@ -411,4 +420,4 @@ void ALedgeHangingActor::Reset()
 		RightCollider->DestroyComponent();
 		RightCollider = nullptr;
 	}
-}
+};
