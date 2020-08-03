@@ -158,7 +158,7 @@ void ADefaultEscapePawn::MoveRight(float Val)
 			FRotator const ControlSpaceRot = GetActorRotation();
 
 			// transform to world space and add it
-			AddMovementInput(FRotationMatrix(ControlSpaceRot).GetScaledAxis(EAxis::Y), bIsAirborn ? Val / 2 : Val);
+			AddMovementInput(FRotationMatrix(ControlSpaceRot).GetScaledAxis(EAxis::Y), GetParkourMovementComponent()->GetIsAirborn() ? Val / 2 : Val);
 		}
 	}
 }
@@ -170,7 +170,7 @@ void ADefaultEscapePawn::MoveForward(float Val)
 		if (Controller)
 		{
 			FRotator const ControlSpaceRot = GetActorRotation();
-			AddMovementInput(FRotationMatrix(ControlSpaceRot).GetScaledAxis(EAxis::X), bIsAirborn ? Val / 2 : Val);
+			AddMovementInput(FRotationMatrix(ControlSpaceRot).GetScaledAxis(EAxis::X), GetParkourMovementComponent()->GetIsAirborn() ? Val / 2 : Val);
 			
 			//FRotator const ControlSpaceRot = Controller->GetControlRotation();
 		/*	FRotator const ControlSpaceRot = GetActorRotation();*/
@@ -204,24 +204,7 @@ UPawnMovementComponent* ADefaultEscapePawn::GetMovementComponent() const
 	return MovementComponent;
 }
 
-
-void ADefaultEscapePawn::SetIsAirborn(bool bNewIsAirborn)
+UParkourMovementComponent* ADefaultEscapePawn::GetParkourMovementComponent() const
 {
-	bIsAirborn = bNewIsAirborn;
+	return (UParkourMovementComponent*)MovementComponent;
 }
-
-bool ADefaultEscapePawn::GetIsAirborn()
-{
-	return bIsAirborn;
-}
-
-void ADefaultEscapePawn::SetMovementState(TEnumAsByte<EPawnMovementState> NewState)
-{
-	CurrentMovementState = NewState;
-}
-
-TEnumAsByte<EPawnMovementState> ADefaultEscapePawn::GetMovementState()
-{
-	return CurrentMovementState;
-}
-

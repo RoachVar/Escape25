@@ -420,4 +420,25 @@ void UParkourMovementComponent::Reset()
 		RightCollider->DestroyComponent();
 		RightCollider = nullptr;
 	}
-};
+}
+
+
+void UParkourMovementComponent::SetIsAirborn(bool bNewIsAirborn)
+{
+	bIsAirborn = bNewIsAirborn;
+}
+
+bool UParkourMovementComponent::GetIsAirborn()
+{
+	return bIsAirborn;
+}
+
+void UParkourMovementComponent::SetMovementState(TEnumAsByte<EParkourMovementState> NewState)
+{
+	CurrentMovementState = NewState;
+}
+
+TEnumAsByte<EParkourMovementState> UParkourMovementComponent::GetMovementState()
+{
+	return CurrentMovementState;
+}

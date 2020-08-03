@@ -14,20 +14,10 @@
 
 class UInputComponent;
 class UPawnMovementComponent;
+class UParkourMovementComponent;
 class UCapsuleComponent;
 class USkeletalMeshComponent;
 
-UENUM(BlueprintType)
-enum EPawnMovementState
-{
-	Walk    UMETA(DisplayName = "Walk"),
-	Crawl   UMETA(DisplayName = "Crawl"),
-	Slide   UMETA(DisplayName = "Slide"),
-	Jump   UMETA(DisplayName = "Jump"),
-	Kong   UMETA(DisplayName = "Kong"),
-	Hang   UMETA(DisplayName = "Hang"),
-	Wallrun   UMETA(DisplayName = "Wallrun"),
-};
 /**
  * DefaultPawn implements a simple Pawn with spherical collision and built-in flying movement.
  * @see UFloatingPawnMovement
@@ -37,11 +27,13 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public APawn
 {
 	GENERATED_UCLASS_BODY()
 
-		// Begin Pawn overrides
-		virtual UPawnMovementComponent* GetMovementComponent() const override;
+	// Begin Pawn overrides
+	virtual UPawnMovementComponent* GetMovementComponent() const override;
 	virtual void SetupPlayerInputComponent(UInputComponent* InInputComponent) override;
 	virtual void UpdateNavigationRelevance() override;
 	// End Pawn overrides
+
+	UParkourMovementComponent* GetParkourMovementComponent() const;
 
 	/**
 	 * Input callback to move forward in local space (or backward if Val is negative).
@@ -88,24 +80,6 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public APawn
 	/** Base lookup rate, in deg/sec. Other scaling may affect final lookup rate. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pawn")
 		float BaseLookUpRate;
-
-	UPROPERTY()
-		bool bIsAirborn = false;
-
-	UFUNCTION(BlueprintCallable)
-	void SetIsAirborn(bool bNewIsAirborn);
-	
-	UFUNCTION(BlueprintPure)
-	bool GetIsAirborn();
-
-	UPROPERTY()
-	TEnumAsByte<EPawnMovementState> CurrentMovementState;
-	
-	UFUNCTION(BlueprintCallable)
-	void SetMovementState(TEnumAsByte<EPawnMovementState> NewState);
-
-	UFUNCTION(BlueprintPure)
-	TEnumAsByte<EPawnMovementState> GetMovementState();
 
 public:
 	/** Name of the MovementComponent.  Use this name if you want to use a different class (with ObjectInitializer.SetDefaultSubobjectClass). */

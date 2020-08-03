@@ -29,6 +29,18 @@ enum EEdgeState
 	Corner,
 };
 
+UENUM(BlueprintType)
+enum EParkourMovementState
+{
+	MSE_Walk   UMETA(DisplayName = "Walk"),
+	MSE_Crawl   UMETA(DisplayName = "Crawl"),
+	MSE_Slide   UMETA(DisplayName = "Slide"),
+	MSE_Jump   UMETA(DisplayName = "Jump"),
+	MSE_Kong   UMETA(DisplayName = "Kong"),
+	MSE_Hang   UMETA(DisplayName = "Hang"),
+	MSE_Wallrun   UMETA(DisplayName = "Wallrun"),
+};
+
 UCLASS(Blueprintable)
 class BUILDING_ESCAPE_API UParkourMovementComponent : public UFloatingPawnMovement
 {
@@ -50,6 +62,14 @@ virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 		void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
 		void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
 
+	UFUNCTION(BlueprintCallable)
+	void SetIsAirborn(bool bNewIsAirborn);
+
+	UFUNCTION(BlueprintPure)
+	bool GetIsAirborn();
+
+	UFUNCTION(BlueprintPure)
+	TEnumAsByte<EParkourMovementState> GetMovementState();
 
 private:
 
@@ -134,9 +154,14 @@ private:
 
 	//Spawned colliders that act as triggers for corner transitions are all bound to this function; Differentation between the left and right collider is handled inside the functions implementation
 	UFUNCTION()
-		void EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	UPROPERTY()
+	TEnumAsByte<EParkourMovementState> CurrentMovementState;
 
+	UFUNCTION(BlueprintCallable)
+	void SetMovementState(TEnumAsByte<EParkourMovementState> NewState);
 
-
+	UPROPERTY()
+	bool bIsAirborn = false;
 };
