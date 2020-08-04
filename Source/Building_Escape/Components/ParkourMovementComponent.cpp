@@ -33,11 +33,17 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (CurrentHangingState != Hanging) { return; }
-	//Setting current velocity to the precisely the value of movement input, effectively nullifying outside influence without having to disable physics simulation(which causes bugs)
-	PawnsRootPrimitive->SetAllPhysicsLinearVelocity(PawnsMovementComponent->GetLastInputVector());
-	//Checking if the player is currently on either edge of the current plane. If so, a collider box that enforces appropriate behaviour(blocking or traversing a corner) will be spawned
-	UpdateEdgeStatuses();
+	switch (CurrentMovementState) {
+	case MSE_Jump:
+		if (bHangingLocked) { return; }
+		TryToHangInCurrentLocation();
+	case MSE_Hang:
+		if (CurrentHangingState != Hanging) { return; }
+		//Setting current velocity to the precisely the value of movement input, effectively nullifying outside influence without having to disable physics simulation(which causes bugs)
+		PawnsRootPrimitive->SetAllPhysicsLinearVelocity(PawnsMovementComponent->GetLastInputVector());
+		//Checking if the player is currently on either edge of the current plane. If so, a collider box that enforces appropriate behaviour(blocking or traversing a corner) will be spawned
+		UpdateEdgeStatuses();
+	}
 
 }
 
@@ -244,7 +250,6 @@ bool UParkourMovementComponent::TestEdgeForCorner(bool bIsEdgeToTheRight, bool b
 	return false;
 }
 
-
 bool UParkourMovementComponent::TryToHangInCurrentLocation()
 {
 	FVector HangLocation(0, 0, 0);
@@ -253,6 +258,7 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 
 	if (bCanHang)
 	{
+		SetMovementState(MSE_Hang);
 		ChangeHangingState(AdjustingLocation);
 		AdjustLocationToHangPosition(HangLocation, HangRotation);
 		return true;
@@ -320,6 +326,7 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 	//Futher processes are carried out depending on what the new state is
 	switch (CurrentHangingState) {
 	case NotHanging:
+		StartNoHangTimer();
 		TogglePlaneLock(false);
 		PawnsRootPrimitive->SetEnableGravity(true);
 		Reset();
@@ -361,6 +368,7 @@ void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) const
 
 void UParkourMovementComponent::FinishHang()
 {
+	SetMovementState(MSE_Jump);
 	ChangeHangingState(NotHanging);
 }
 
@@ -442,3 +450,15 @@ TEnumAsByte<EParkourMovementState> UParkourMovementComponent::GetMovementState()
 {
 	return CurrentMovementState;
 }
+void UParkourMovementComponent::StartNoHangTimer()
+{
+	bHangingLocked = true;
+	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.5, false);
+}
+
+void UParkourMovementComponent::EndNoHangTimer()
+{
+	bHangingLocked = false;
+}
+
+

@@ -164,4 +164,9 @@ private:
 
 	UPROPERTY()
 	bool bIsAirborn = false;
+
+	FTimerHandle NoHangTimerHandle;
+	bool bHangingLocked = false;
+	void StartNoHangTimer();
+	void EndNoHangTimer();
 };
