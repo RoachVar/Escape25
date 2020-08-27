@@ -55,20 +55,10 @@ void UInteractor::BeginPlay()
 	CollisionMesh->OnComponentBeginOverlap.AddDynamic(this, &UInteractor::OnOverlapBegin);
 	CollisionMesh->OnComponentEndOverlap.AddDynamic(this, &UInteractor::OnEndOverlap);
 	
-	//Finding  a physics handle that should be found on the actor and storing a pointer to it as a member variable. Binding input functions to delegates.
-	FindAndAssignPhysicsHandle();
+	//Binding input functions to delegates.
 	BindInputs();
 	// ...
 	
-}
-
-void UInteractor::FindAndAssignPhysicsHandle()
-{
-	PhysicsHandle = GetOwner()->FindComponentByClass<UPhysicsHandleComponent>();
-	if (!PhysicsHandle)
-	{
-		UE_LOG(LogTemp, Error, TEXT("No Physics Handle component on actor %s!"), *GetOwner()->GetName())
-	}
 }
 
 void UInteractor::BindInputs()
@@ -92,19 +82,6 @@ void UInteractor::BindInputs()
 void UInteractor::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (HeldGrabbable)
-	{
-		if (MarkedInteractables.Num() > 0)
-		{
-			TArray<UInteractable*> Nullptr;
-			RefreshMarkedInteractables(Nullptr);
-		}
-
-		PhysicsHandle->SetTargetLocation(GetComponentLocation());
-
-		return;
-	}
-	
 
 	FVector ViewpointLocation;
 	FRotator ViewpointRotation;
@@ -122,20 +99,6 @@ void UInteractor::InitiateInteraction()
 	if (FocusedInteractable)
 	{
 		FocusedInteractable->StartInteraction();
-
-		if (false == true && FocusedInteractable->CurrentInteractionType == Hold)
-		{
-			if (!PhysicsHandle) { return; }
-			HeldGrabbable = FocusedInteractable;
-			PhysicsHandle->GrabComponentAtLocation
-			(
-				HeldGrabbable->GetOwningPrimitive(),
-				NAME_None,
-				GetOwner()->GetRootComponent()->GetComponentLocation()
-			);
-			PhysicsHandle->SetTargetLocation(GetComponentLocation());
-			SetFocusedInteractable(nullptr);
-		}
 	}
 
 	//UE_LOG(LogTemp, Error, TEXT("PICKED UP"));
@@ -143,13 +106,6 @@ void UInteractor::InitiateInteraction()
 
 void UInteractor::TerminateInteraction()
 {
-	if (HeldGrabbable)
-	{
-		PhysicsHandle->ReleaseComponent();
-		HeldGrabbable = nullptr;
-		return;
-	}
-	
 	if (FocusedInteractable)
 	{
 		FocusedInteractable->EndInteraction();

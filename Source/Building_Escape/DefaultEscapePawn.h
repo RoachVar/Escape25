@@ -5,6 +5,7 @@
 //
 //=============================================================================
 
+// HACK: This class is essentially a slightly modified clone of the Default Pawn class. It would probably be strongly preferable to just work on the source version of the engine and modify to be allowed to modify that default class.
 #pragma once
 
 #include "CoreMinimal.h"

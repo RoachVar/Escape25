@@ -12,7 +12,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGrabStateChangedDelegate, bool, bNe
 class UBoxComponent;
 class UCapsuleComponent;
 
-//Declaring an enumarator that signifies the current state of hanging; used only internally
+//Enumarator that signifies the current state of hanging; used only internally
 enum EHangingState
 {
 	NotHanging,
@@ -21,7 +21,7 @@ enum EHangingState
 	TraversingACorner
 };
 
-//Declaring an enumerator that signifies the current state of the edges on the left and right extremes of the curernt hanging plane; used only internally
+//Enumerator that signifies the current state of the edges on the left and right extremes of the curernt hanging plane; used only internally
 enum EEdgeState
 {
 	Unknown,
@@ -46,11 +46,6 @@ class BUILDING_ESCAPE_API UParkourMovementComponent : public UFloatingPawnMoveme
 {
 	GENERATED_BODY()
 
-
-public:
-	// Sets default values for this actor's properties
-//UParkourMovementComponent();
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -58,10 +53,12 @@ protected:
 public:
 	// Called every frame
 virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-	// Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
+	
+// Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
 		void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
 		void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
 
+// Setter and Getter functions for private variables
 	UFUNCTION(BlueprintCallable)
 	void SetIsAirborn(bool bNewIsAirborn);
 
@@ -73,7 +70,8 @@ virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponent
 
 private:
 
-	// Parameters that define the rules of testing hangability and attachment. Can be set from blueprint by an appropriate function
+	// Parameters that define the rules of testing hangability and attachment. Values can be overriden from blueprint through an appropriate function
+	
 	// Siza of box trace that is performed just above the potential edge to check if there is sufficient empty space
 	FVector HandSize = FVector(5, 15, 1);
 	// Vertical distance from player pivot at which the test is performed
@@ -98,26 +96,26 @@ private:
 	// Pointers to collider boxes responsible for edge interactions. The colliders are spawned(and destroyed) in runtime and act as blocking volumes or triggers depending on the edge status.
 	UBoxComponent* LeftCollider = nullptr;
 	UBoxComponent* RightCollider = nullptr;
-	// Transforms that store the location and rotation(Scale is always set to 1,1,1) the player will be blended to after traversing the respecitve corner. If the edge is non-traversable, the respective variable is not used.
+	// Transform variables that store the location and rotation(Scale is always set to 1,1,1) the player will be blended to after traversing the respecitve corner. If the edge is non-traversable, the respective variable is not used.
 	FTransform LeftEdgeTargetTransform;
 	FTransform RightEdgeTargetTransform;
 
 	// Performs several traces that verify if the location and rotation passed can be projected to a fully valid hanging spot. The out parameters are only assigned when the function returns true
 	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const;
 
-	// This function locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
+	// Locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
 	void TogglePlaneLock(bool bNewIsLocked) const;
 
 	// This value signifies which procedure that forms the hanging system is currently underway. It should be assigned only using the function below
 	TEnumAsByte<EHangingState> CurrentHangingState;
 
-	// This function assigns the value passed to CurrentHangingState in and then applies effects specific to the new state
+	// Assigns the value passed to CurrentHangingState in and then applies effects specific to the new state
 	void ChangeHangingState(TEnumAsByte<EHangingState> NewHangingState);
 
 	//Tries to detect a corner or blockage in every direction(inner left, outer left, inner right, outer right) and sets the EdgeState variables accordingly, as well as calls SpawnEdgeCollider when necessary
 	void UpdateEdgeStatuses();
 
-	//Triggers IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true
+	//Triggers IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true. Called several times by UpdateEdgeStatuses
 	bool TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform& OutTransform) const;
 
 	// Collider boxes are spawned to represent an interaction with an edge - they act as blocking volumes when the edge is non-traversable and as triggers if a corner transition is expected
@@ -130,7 +128,7 @@ private:
 	UFUNCTION(BlueprintCallable)
 		void SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight);
 
-	//A function that is called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
+	//Called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
 	UFUNCTION(BlueprintCallable)
 		void AdjustmentEnded();
 

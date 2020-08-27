@@ -22,10 +22,6 @@ void UOpenDoor::BeginPlay()
 	Super::BeginPlay();
 	bDelayActive = false;
 	InitialYaw = GetAttachParent()->GetComponentRotation().Yaw;
-
-	//toggleshouldbeopened(false);
-	//soughtactor = ugameplaystatics::getplayerpawn(this, 0);
-
 	
 	
 }

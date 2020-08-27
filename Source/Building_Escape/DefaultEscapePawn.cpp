@@ -60,7 +60,6 @@ ADefaultEscapePawn::ADefaultEscapePawn(const FObjectInitializer& ObjectInitializ
 		//MeshComponent->CreateDefaultSubobject<USkeletalMesh>(ADefaultEscapePawn::MeshComponentName);
 		MeshComponent->AlwaysLoadOnClient = true;
 		MeshComponent->AlwaysLoadOnServer = true;
-		//MeshComponent->bOwnerNoSee = true;
 		MeshComponent->bCastDynamicShadow = true;
 		MeshComponent->bAffectDynamicIndirectLighting = false;
 		MeshComponent->bAffectDistanceFieldLighting = false;
