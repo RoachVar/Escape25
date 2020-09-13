@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/FloatingPawnMovement.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "ParkourMovementComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FHangingTransitionDelegate, FVector, Location, FRotator, Rotation);
@@ -41,22 +41,35 @@ enum EParkourMovementState
 	MSE_Wallrun   UMETA(DisplayName = "Wallrun"),
 };
 
+enum ETraceDirection
+{
+	TraceDirection_Ahead,
+	TraceDirection_Behind,
+	TraceDirection_Left,
+	TraceDirection_Right,
+	TraceDirection_Up,
+	TraceDirection_Down,
+	MAX
+};
+
 UCLASS(Blueprintable)
-class BUILDING_ESCAPE_API UParkourMovementComponent : public UFloatingPawnMovement
+class BUILDING_ESCAPE_API UParkourMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	// Called every frame
-virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	UParkourMovementComponent();
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
 // Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
-		void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
-		void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
+	void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
+	void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
 
 // Setter and Getter functions for private variables
 	UFUNCTION(BlueprintCallable)
@@ -73,11 +86,11 @@ private:
 	// Parameters that define the rules of testing hangability and attachment. Values can be overriden from blueprint through an appropriate function
 	
 	// Siza of box trace that is performed just above the potential edge to check if there is sufficient empty space
-	FVector HandSize = FVector(5, 15, 1);
+	FVector HandSize = FVector(5, 15, 10);
 	// Vertical distance from player pivot at which the test is performed
-	float GrabHeight = 65;
+	float GrabHeight = 25;
 	// forward distance from player pivot at which the test is performed
-	float GrabbingReach = 100;
+	float GrabbingReach = 200;
 	// Vertical distance between player pivot and the edge that the player is hanging on
 	float AttachHeight = 65.0;
 	// Forward distance between the player pivot and the wall the player is hanging on
@@ -104,7 +117,7 @@ private:
 	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const;
 
 	// Locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
-	void TogglePlaneLock(bool bNewIsLocked) const;
+	void TogglePlaneLock(bool bNewIsLocked);
 
 	// This value signifies which procedure that forms the hanging system is currently underway. It should be assigned only using the function below
 	TEnumAsByte<EHangingState> CurrentHangingState;
@@ -126,19 +139,19 @@ private:
 
 	//Overrides default detection and attachment parameters with custom values
 	UFUNCTION(BlueprintCallable)
-		void SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight);
+	void SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight);
 
 	//Called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
 	UFUNCTION(BlueprintCallable)
-		void AdjustmentEnded();
+	void AdjustmentEnded();
 
 	//Triggers IsValidHangPoint with the current location and rotation passed in and begins hanging at the returned transform if the check returned true; Call this to attempt hanging
 	UFUNCTION(BlueprintCallable)
-		bool TryToHangInCurrentLocation();
+	bool TryToHangInCurrentLocation();
 
 	//Ceases the hanging altogether. Call to exit hang
 	UFUNCTION(BlueprintCallable)
-		void FinishHang();
+	void FinishHang();
 
 	//A dispatcher that triggers wherever the CurrentHangingState changes from NotHanging to any other state or the reverse. It returns a bool that signifies wherever the new state is NotHanging or any other state.
 	UPROPERTY(BlueprintAssignable)
@@ -163,8 +176,21 @@ private:
 	UPROPERTY()
 	bool bIsAirborn = false;
 
+	float MaxWallrunTime;
+
+
 	FTimerHandle NoHangTimerHandle;
+	FTimerHandle WallrunTimerHandle;
 	bool bHangingLocked = false;
 	void StartNoHangTimer();
 	void EndNoHangTimer();
+	bool TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection);
+	TMap<TEnumAsByte<ETraceDirection>, FRotator> TraceDirectionOffsets;
+	TArray<TEnumAsByte<ETraceDirection>> BlockedDirections;
+	void UpdateBlockedDirections();
+	void OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection);
+	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
+	void WallrunTimerEnd();
+	bool bCanWallrun = true;
+
 };

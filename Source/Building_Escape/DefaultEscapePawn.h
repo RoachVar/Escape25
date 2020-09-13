@@ -10,21 +10,19 @@
 
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 #include "DefaultEscapePawn.generated.h"
 
 class UInputComponent;
 class UPawnMovementComponent;
 class UParkourMovementComponent;
-class UCapsuleComponent;
-class USkeletalMeshComponent;
 
 /**
  * DefaultPawn implements a simple Pawn with spherical collision and built-in flying movement.
  * @see UFloatingPawnMovement
  */
 UCLASS(config = Game, Blueprintable, BlueprintType)
-class BUILDING_ESCAPE_API ADefaultEscapePawn : public APawn
+class BUILDING_ESCAPE_API ADefaultEscapePawn : public ACharacter
 {
 	GENERATED_UCLASS_BODY()
 
@@ -82,41 +80,20 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public APawn
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pawn")
 		float BaseLookUpRate;
 
-public:
-	/** Name of the MovementComponent.  Use this name if you want to use a different class (with ObjectInitializer.SetDefaultSubobjectClass). */
-	static FName MovementComponentName;
+//public:
+//	/** Name of the MovementComponent.  Use this name if you want to use a different class (with ObjectInitializer.SetDefaultSubobjectClass). */
+//	static FName MovementComponentName;
+//
+//protected:
+//	/** DefaultPawn movement component */
+//	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+//		UPawnMovementComponent* MovementComponent;
 
-protected:
-	/** DefaultPawn movement component */
-	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-		UPawnMovementComponent* MovementComponent;
-
-public:
-	/** Name of the CollisionComponent. */
-	static FName CollisionComponentName;
-
-private:
-	/** DefaultPawn collision component */
-	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-		UCapsuleComponent* CollisionComponent;
-public:
-
-	/** Name of the MeshComponent. Use this name if you want to prevent creation of the component (with ObjectInitializer.DoNotCreateDefaultSubobject). */
-	static FName MeshComponentName;
-
-private:
-	/** The mesh associated with this Pawn. */
-	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-		USkeletalMeshComponent* MeshComponent;
 public:
 
 	/** If true, adds default input bindings for movement and camera look. */
 	UPROPERTY(Category = Pawn, EditAnywhere, BlueprintReadOnly)
 		uint32 bAddDefaultMovementBindings : 1;
 
-	/** Returns CollisionComponent subobject **/
-	UCapsuleComponent* GetCollisionComponent() const { return CollisionComponent; }
-	/** Returns MeshComponent subobject **/
-	USkeletalMeshComponent* GetMeshComponent() const { return MeshComponent; }
 };
 

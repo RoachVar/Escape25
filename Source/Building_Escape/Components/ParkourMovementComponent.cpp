@@ -11,21 +11,29 @@
 #include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
-//UParkourMovementComponent::UParkourMovementComponent()
-//{
-// 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-//	PrimaryComponentTick.bCanEverTick = true;
-//	PrimaryComponentTick.bStartWithTickEnabled = true;
-//}
+UParkourMovementComponent::UParkourMovementComponent()
+{
+ 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
+}
 
 // Called when the game starts or when spawned
 void UParkourMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	MaxWallrunTime = 2;
 	SetComponentTickEnabled(true);
 	PawnsRootPrimitive = (UCapsuleComponent*)(GetOwner()->GetRootComponent());
-	PawnsMovementComponent = (UPawnMovementComponent*)GetOwner()->GetComponentByClass(UPawnMovementComponent::StaticClass());
+	PawnsMovementComponent = (UPawnMovementComponent*)this;
 	PawnsRootPrimitive->GetUnscaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
+
+	TraceDirectionOffsets.Add(TraceDirection_Ahead, FRotator(0, 0, 0));
+	TraceDirectionOffsets.Add(TraceDirection_Behind, FRotator(0, 180, 0));
+	TraceDirectionOffsets.Add(TraceDirection_Left, FRotator(0, -90, 0));
+	TraceDirectionOffsets.Add(TraceDirection_Right, FRotator(0, 90, 0));
+	TraceDirectionOffsets.Add(TraceDirection_Up, FRotator(90, 0, 0));
+	TraceDirectionOffsets.Add(TraceDirection_Down, FRotator(-90, 0, 0));
 }
 
 // Called every frame
@@ -34,15 +42,32 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	switch (CurrentMovementState) {
+	case MSE_Walk:
+		UpdateBlockedDirections();
+		break;
 	case MSE_Jump:
+		UpdateBlockedDirections();
 		if (bHangingLocked) { return; }
 		TryToHangInCurrentLocation();
+		break;
 	case MSE_Hang:
 		if (CurrentHangingState != Hanging) { return; }
 		//Setting current velocity to the precisely the value of movement input, effectively nullifying outside influence without having to disable physics simulation(which causes bugs)
-		PawnsRootPrimitive->SetAllPhysicsLinearVelocity(PawnsMovementComponent->GetLastInputVector());
+		//Velocity = GetLastInputVector();
 		//Checking if the player is currently on either edge of the current plane. If so, a collider box that enforces appropriate behaviour(blocking or traversing a corner) will be spawned
 		UpdateEdgeStatuses();
+		break;
+	case MSE_Wallrun:
+		if (false || abs(GetLastUpdateRotation().RotateVector(Velocity).X) > 1000)
+		{
+			SetMovementState(MSE_Jump);
+		}
+		else
+		{
+			Velocity = GetOwner()->GetActorRotation().RotateVector(FVector(1200, 0, 0));
+			UpdateBlockedDirections();
+		}
+		break;
 	}
 
 }
@@ -269,6 +294,7 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 		return false;
 	}
 }
+
 void UParkourMovementComponent::SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight)
 {
 	HandSize = NewHandSize;
@@ -277,6 +303,7 @@ void UParkourMovementComponent::SetParameters(FVector NewHandSize, float NewGrab
 	AttachDistance = NewAttachDistance;
 	AttachHeight = NewAttachHeight;
 }
+
 void UParkourMovementComponent::AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation)
 {
 	if (LocationAdjustment.IsBound())
@@ -328,19 +355,19 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 	case NotHanging:
 		StartNoHangTimer();
 		TogglePlaneLock(false);
-		PawnsRootPrimitive->SetEnableGravity(true);
+		GravityScale = 1;
 		Reset();
 		break;
 	case AdjustingLocation:
-		GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
-		PawnsRootPrimitive->SetEnableGravity(false);
-		PawnsRootPrimitive->SetAllPhysicsLinearVelocity(FVector(0, 0, 0));
+		//GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
+		GravityScale = 0;
+		Velocity = FVector(0, 0, 0);
 	case TraversingACorner:
 		Reset();
 		break;
 	case Hanging:
 		TogglePlaneLock(true);
-		GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
+		//GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
 		break;
 	
 	}
@@ -351,23 +378,24 @@ void UParkourMovementComponent::AdjustmentEnded()
 	ChangeHangingState(Hanging);
 }
 
-void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) const
+void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) 
 {
 	if (bNewIsLocked)
 	{
-		PawnsMovementComponent->SetPlaneConstraintFromVectors(FRotator(0,90,9).RotateVector(GetOwner()->GetActorForwardVector()), FVector(0, 0, 1));
-		PawnsMovementComponent->SetPlaneConstraintEnabled(true);
-		PawnsRootPrimitive->SetConstraintMode(EDOFMode::XYPlane);
+		SetPlaneConstraintAxisSetting(EPlaneConstraintAxisSetting::Y);
+		SetPlaneConstraintNormal(GetLastUpdateRotation().RotateVector(FVector(1,0,0)));
+		SetPlaneConstraintEnabled(true);
+		//PawnsRootPrimitive->SetConstraintMode(EDOFMode::XYPlane);
 	}
 	else
 	{
-		PawnsMovementComponent->SetPlaneConstraintEnabled(false);
-		PawnsRootPrimitive->SetConstraintMode(EDOFMode::None);
+		SetPlaneConstraintEnabled(false);
 	}
 }
 
 void UParkourMovementComponent::FinishHang()
 {
+	SetMovementMode(MOVE_Falling);
 	SetMovementState(MSE_Jump);
 	ChangeHangingState(NotHanging);
 }
@@ -394,6 +422,11 @@ void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform 
 	//Registering the component and assigning it to the pointer depending on the bool that was passed into this function(that signifies which edge this collision will represent)
 	NewColliderObject->RegisterComponentWithWorld(GetWorld());
 	(bIsRightEdge ? RightCollider : LeftCollider) = NewColliderObject;
+
+	//NewColliderObject->SetHiddenInGame(false);
+	//FString debug = bIsRightEdge ? "right" : "left";
+	//FString debug2 = ((bIsRightEdge ? RightEdgeState : LeftEdgeState) == Block) ? "block" : "corner";
+	//UE_LOG(LogTemp, Warning, TEXT("Spawn: %s %s"), *debug, *debug2)
 }
 
 void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -430,7 +463,6 @@ void UParkourMovementComponent::Reset()
 	}
 }
 
-
 void UParkourMovementComponent::SetIsAirborn(bool bNewIsAirborn)
 {
 	bIsAirborn = bNewIsAirborn;
@@ -441,24 +473,178 @@ bool UParkourMovementComponent::GetIsAirborn()
 	return bIsAirborn;
 }
 
+void UParkourMovementComponent::WallrunTimerEnd()
+{
+	bCanWallrun = false;
+	if (CurrentMovementState = MSE_Wallrun)
+	{
+		SetMovementState(MSE_Jump);
+	}
+}
+
 void UParkourMovementComponent::SetMovementState(TEnumAsByte<EParkourMovementState> NewState)
 {
 	CurrentMovementState = NewState;
+
+	switch (NewState) {
+	case MSE_Walk:
+		bUseControllerDesiredRotation = true;
+		GravityScale = 1;
+		bCanWallrun = true;
+		WallrunTimerHandle.Invalidate();
+		break;
+	case MSE_Jump:
+		bUseControllerDesiredRotation = true;
+		GravityScale = 1;
+		GetWorld()->GetTimerManager().PauseTimer(WallrunTimerHandle);
+		break;
+	case MSE_Wallrun:
+		bUseControllerDesiredRotation = false;
+		GravityScale = 0;
+		if (!(GetWorld()->GetTimerManager().IsTimerActive(WallrunTimerHandle)) && !(GetWorld()->GetTimerManager().IsTimerPaused(WallrunTimerHandle)) && bCanWallrun)
+		{
+			GetWorld()->GetTimerManager().SetTimer(WallrunTimerHandle, this, &UParkourMovementComponent::WallrunTimerEnd, MaxWallrunTime, false);
+		}
+		else
+		{
+			GetWorld()->GetTimerManager().UnPauseTimer(WallrunTimerHandle);
+		}
+		break;
+	case MSE_Hang:
+		bUseControllerDesiredRotation = false;
+		bCanWallrun = true;
+		SetMovementMode(MOVE_Flying);
+		WallrunTimerHandle.Invalidate();
+		break;
+	default:
+		bUseControllerDesiredRotation = true;
+		GravityScale = 1;
+		break;
+	}
+
 }
 
 TEnumAsByte<EParkourMovementState> UParkourMovementComponent::GetMovementState()
 {
 	return CurrentMovementState;
 }
+
 void UParkourMovementComponent::StartNoHangTimer()
 {
 	bHangingLocked = true;
-	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.5, false);
+	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.2, false);
 }
 
 void UParkourMovementComponent::EndNoHangTimer()
 {
 	bHangingLocked = false;
 }
+
+bool UParkourMovementComponent::TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection)
+{
+	FRotator TraceRotationOffset = TraceDirectionOffsets.FindRef(TraceDirection);
+	float TraceLength = (TraceDirection == TraceDirection_Up || TraceDirection_Down ? CapsuleHalfHeight : CapsuleRadius * 2) + CapsuleRadius;
+	FVector TraceStart = GetOwner()->GetActorLocation();
+	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
+	FColor debugcolor;
+	switch (TraceDirection) {
+		case TraceDirection_Ahead:
+			debugcolor = FColor::Red;
+			break;
+		case TraceDirection_Behind:
+			debugcolor = FColor::Blue;
+			break;
+		case TraceDirection_Left:
+			debugcolor = FColor::Purple;
+			break;
+		case TraceDirection_Right:
+			debugcolor = FColor::Green;
+			break;
+		case TraceDirection_Up:
+			debugcolor = FColor::Cyan;
+			break;
+		case TraceDirection_Down:
+			debugcolor = FColor::Magenta;
+			break;
+	}
+	//DrawDebugLine(GetWorld(), TraceStart, TraceStart + (GetOwner()->GetActorRotation() + TraceRotationOffset).RotateVector(FVector(TraceLength, 0, 0)), debugcolor, true);
+	return GetWorld()->LineTraceTestByChannel(
+		TraceStart,
+		TraceStart + (GetOwner()->GetActorRotation() + TraceRotationOffset).RotateVector(FVector(TraceLength, 0, 0)),
+		ECollisionChannel::ECC_WorldStatic,
+		TraceParams
+	);
+
+}
+
+void UParkourMovementComponent::UpdateBlockedDirections()
+{
+	for (int DirectionIndex = 0; DirectionIndex < ETraceDirection::MAX; DirectionIndex++)
+	{
+		TEnumAsByte<ETraceDirection> TraceDirection = ETraceDirection(DirectionIndex);
+		if (TraceForBlockInDirection(TraceDirection))
+		{
+			OnDirectionOverlap(TraceDirection);
+			BlockedDirections.AddUnique(TraceDirection);
+		}
+		else
+		{
+			if (BlockedDirections.Contains(TraceDirection))
+			{
+				BlockedDirections.Remove(TraceDirection);
+				OnDirectionOverlapEnd(TraceDirection);
+			}
+		}
+	}
+}
+
+void UParkourMovementComponent::OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection)
+{
+	switch (TraceDirection) {
+		default:
+			break;
+		case TraceDirection_Ahead:
+			if (CurrentMovementState == MSE_Wallrun)
+			{
+				SetMovementState(MSE_Jump);
+			}
+			break;
+		case TraceDirection_Left:
+		case TraceDirection_Right:
+			if (CurrentMovementState == MSE_Jump && bCanWallrun && !BlockedDirections.Contains(TraceDirection_Ahead) && (!WallrunTimerHandle.IsValid() || GetWorld()->GetTimerManager().GetTimerRemaining(WallrunTimerHandle) > 1))
+			{
+				SetMovementState(MSE_Wallrun);
+			}
+				break;
+		case TraceDirection_Down:
+			if (CurrentMovementState == MSE_Wallrun)
+			{
+				SetMovementState(MSE_Jump);
+			}
+				break;
+	}
+}
+
+void UParkourMovementComponent::OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection)
+{
+	switch (TraceDirection) {
+	default:
+		break;
+	case TraceDirection_Left:
+	case TraceDirection_Right:
+		if (!BlockedDirections.Contains(TraceDirection_Left) && !BlockedDirections.Contains(TraceDirection_Right))
+		{
+			SetMovementState(MSE_Jump);
+		}
+			break;
+	}
+}
+
+void UParkourMovementComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	GetWorld()->GetTimerManager().ClearAllTimersForObject(this);
+}
+
 
 
