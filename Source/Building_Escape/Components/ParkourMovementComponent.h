@@ -88,7 +88,7 @@ private:
 	// Siza of box trace that is performed just above the potential edge to check if there is sufficient empty space
 	FVector HandSize = FVector(5, 15, 10);
 	// Vertical distance from player pivot at which the test is performed
-	float GrabHeight = 25;
+	float GrabHeight = 65;
 	// forward distance from player pivot at which the test is performed
 	float GrabbingReach = 200;
 	// Vertical distance between player pivot and the edge that the player is hanging on
