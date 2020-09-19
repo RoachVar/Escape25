@@ -32,6 +32,9 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public ACharacter
 	virtual void UpdateNavigationRelevance() override;
 	// End Pawn overrides
 
+	// Begin Character overrides
+	// End Character overrides
+
 	UParkourMovementComponent* GetParkourMovementComponent() const;
 
 	/**

@@ -66,7 +66,14 @@ public:
 	// Called every frame
 	UParkourMovementComponent();
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-	
+
+	virtual bool DoJump(bool bReplayingMoves) override;
+	virtual bool CanAttemptJump() const override;
+
+	//BEGIN UMovementComponent Interface
+	virtual bool IsMovingOnGround() const override;
+	//END UMovementComponent Interface
+
 // Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
 	void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
 	void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
@@ -180,17 +187,24 @@ private:
 
 
 	FTimerHandle NoHangTimerHandle;
+	FTimerHandle NoWallrunTimerHandle;
 	FTimerHandle WallrunTimerHandle;
 	bool bHangingLocked = false;
 	void StartNoHangTimer();
 	void EndNoHangTimer();
+	void StartNoWallrunTimer();
+	void EndNoWallrunTimer();
 	bool TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection);
 	TMap<TEnumAsByte<ETraceDirection>, FRotator> TraceDirectionOffsets;
+	TMap < TEnumAsByte <ETraceDirection> , FHitResult > DirectionTraceHitResults;
 	TArray<TEnumAsByte<ETraceDirection>> BlockedDirections;
 	void UpdateBlockedDirections();
 	void OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection);
 	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
+	void WallrunTimerStart();
 	void WallrunTimerEnd();
 	bool bCanWallrun = true;
+	FVector JumpOffPoint;
+	bool IsFullfillingWallrunConditions();
 
 };
