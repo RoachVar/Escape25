@@ -93,15 +93,15 @@ private:
 	// Parameters that define the rules of testing hangability and attachment. Values can be overriden from blueprint through an appropriate function
 	
 	// Siza of box trace that is performed just above the potential edge to check if there is sufficient empty space
-	FVector HandSize = FVector(5, 15, 10);
+	FVector HandSize;
 	// Vertical distance from player pivot at which the test is performed
-	float GrabHeight = 65;
+	float GrabHeight;
 	// forward distance from player pivot at which the test is performed
-	float GrabbingReach = 200;
+	float GrabbingReach;
 	// Vertical distance between player pivot and the edge that the player is hanging on
-	float AttachHeight = 65.0;
+	float AttachHeight;
 	// Forward distance between the player pivot and the wall the player is hanging on
-	float AttachDistance = 37;
+	float AttachDistance;
 //
 	// Pointers to the owners root capsule and movement component; assigned in BeginPlay
 	UCapsuleComponent* PawnsRootPrimitive = nullptr;

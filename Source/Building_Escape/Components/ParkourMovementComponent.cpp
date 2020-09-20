@@ -17,6 +17,8 @@ UParkourMovementComponent::UParkourMovementComponent()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = true;
+	
+
 }
 
 // Called when the game starts or when spawned
@@ -27,7 +29,17 @@ void UParkourMovementComponent::BeginPlay()
 	SetComponentTickEnabled(true);
 	PawnsRootPrimitive = (UCapsuleComponent*)(GetOwner()->GetRootComponent());
 	PawnsMovementComponent = (UPawnMovementComponent*)this;
-	PawnsRootPrimitive->GetUnscaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
+	PawnsRootPrimitive->GetScaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
+	
+	HandSize = FVector(5, 15, 1);
+	// Vertical distance from player pivot at which the test is performed
+	GrabHeight = 65;
+	// forward distance from player pivot at which the test is performed
+	GrabbingReach = 100;
+	// Vertical distance between player pivot and the edge that the player is hanging on
+	AttachHeight = 65.0;
+	// Forward distance between the player pivot and the wall the player is hanging on
+	AttachDistance = CapsuleRadius + 6;
 
 	TraceDirectionOffsets.Add(TraceDirection_Ahead, FRotator(0, 0, 0));
 	TraceDirectionOffsets.Add(TraceDirection_Behind, FRotator(0, 180, 0));
@@ -52,7 +64,14 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		TryToHangInCurrentLocation();
 		break;
 	case MSE_Hang:
-		if (CurrentHangingState != Hanging) { return; }
+		if (CurrentHangingState != Hanging)
+		{
+			return;
+		}
+		else
+		{
+
+		}
 		//Setting current velocity to the precisely the value of movement input, effectively nullifying outside influence without having to disable physics simulation(which causes bugs)
 		//Velocity = GetLastInputVector();
 		//Checking if the player is currently on either edge of the current plane. If so, a collider box that enforces appropriate behaviour(blocking or traversing a corner) will be spawned
@@ -223,19 +242,14 @@ bool UParkourMovementComponent::IsValidHangPoint(OUT FVector& OutHangLocation, O
 
 	if (LineTraceHitResult.bBlockingHit)
 	{
-		//No space for body
-		return false;
-	}
 
-	if (LineTraceHitResult.bBlockingHit)
-	{
 		//No space for body
 		return false;
 	}
 
 	//Trace across Z dimension
 	GetWorld()->LineTraceSingleByChannel
-	(
+	(	
 		OUT LineTraceHitResult,
 		AdjustedLocation + AdjustedRotation.RotateVector(FVector(0, 0, CapsuleHalfHeight)),
 		AdjustedLocation + AdjustedRotation.RotateVector(FVector(CapsuleRadius, 0, -CapsuleHalfHeight)),
@@ -258,7 +272,7 @@ bool UParkourMovementComponent::IsValidHangPoint(OUT FVector& OutHangLocation, O
 bool UParkourMovementComponent::TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform &OutTransform) const
 {
 	FRotator OffsetRotation = GetOwner()->GetActorRotation() + FRotator(0, bIsEdgeToTheRight != bTestForOuterEdge ? 90 : -90, 0);
-	float XOffset = (bTestForOuterEdge ? 3 : -1) * CapsuleRadius;
+	float XOffset = (bTestForOuterEdge ? 3.5f : -1) * CapsuleRadius;
 	float YOffset = bTestForOuterEdge ? (bIsEdgeToTheRight ? 1 : -1) * CapsuleRadius : 0;
 	FVector OffsetLocation = GetOwner()->GetActorRotation().RotateVector(FVector(XOffset, YOffset, 0)) + GetActorLocation();
 
@@ -268,9 +282,6 @@ bool UParkourMovementComponent::TestEdgeForCorner(bool bIsEdgeToTheRight, bool b
 	if (IsValidHangPoint(OUT HangLocation, OUT HangRotation, OffsetLocation, OffsetRotation))
 	{
 		OutTransform = FTransform(HangRotation, HangLocation, FVector(1, 1, 1));
-		//FString DirectionString = bIsEdgeToTheRight ? TEXT("Right") : TEXT("Left");
-		//FString EdgeTypeString = bTestForOuterEdge ? TEXT("Outer") : TEXT("Inner");
-		//UE_LOG(LogTemp, Warning, TEXT("%s edge detected - %s edge"), *DirectionString, *EdgeTypeString);
 		return true;
 	}
 
@@ -349,6 +360,9 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 		HangingStateChanged.Broadcast(!bIsNewStateNotHanging);
 	}
 	
+	FVector TargetLocation;
+	FRotator TargetRotation;
+
 	//The member variable that stores the current state is set to the value that was passed in
 	CurrentHangingState = NewHangingState;
 	
@@ -361,15 +375,26 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 		Reset();
 		break;
 	case AdjustingLocation:
-		//GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
+		GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
 		GravityScale = 0;
 		Velocity = FVector(0, 0, 0);
 	case TraversingACorner:
+		GetOwner()->SetActorEnableCollision(false);
 		Reset();
 		break;
 	case Hanging:
+		//if (IsValidHangPoint(OUT TargetLocation, OUT TargetRotation, LastUpdateLocation, LastUpdateRotation.Rotator()))
+		//{
+		//	GetOwner()->SetActorLocation(TargetLocation);
+		//	GetOwner()->SetActorRotation(TargetRotation);
+		//}
+		//else
+		//{
+		//	SetMovementState(MSE_Jump);
+		//}
 		TogglePlaneLock(true);
-		//GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
+		GetOwner()->SetActorEnableCollision(true);
+		GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
 		break;
 	
 	}
@@ -382,10 +407,11 @@ void UParkourMovementComponent::AdjustmentEnded()
 
 void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) 
 {
+
 	if (bNewIsLocked)
 	{
 		SetPlaneConstraintAxisSetting(EPlaneConstraintAxisSetting::Y);
-		SetPlaneConstraintNormal(GetLastUpdateRotation().RotateVector(FVector(1,0,0)));
+		SetPlaneConstraintNormal(GetOwner()->GetActorRotation().RotateVector(FVector(1,0,0)));
 		SetPlaneConstraintEnabled(true);
 		//PawnsRootPrimitive->SetConstraintMode(EDOFMode::XYPlane);
 	}
@@ -405,7 +431,9 @@ void UParkourMovementComponent::FinishHang()
 void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform)
 {
 	//Creating a collider and setting its extent
-	UBoxComponent * NewColliderObject = NewObject<UBoxComponent>(this);
+	AActor * NewActor = GetWorld()->SpawnActor<AActor>();
+	UBoxComponent * NewColliderObject = NewObject<UBoxComponent>(NewActor);
+	
 	NewColliderObject->SetBoxExtent(FVector(64, 6, 64));
 	
 	//Setting the transform of the collider to the transform passed into this function
@@ -421,14 +449,12 @@ void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform 
 		NewColliderObject->OnComponentBeginOverlap.AddDynamic(this, &UParkourMovementComponent::EdgeOverlapBegin);
 	}
 	
-	//Registering the component and assigning it to the pointer depending on the bool that was passed into this function(that signifies which edge this collision will represent)
-	NewColliderObject->RegisterComponentWithWorld(GetWorld());
+	//Registering the component 
+	NewColliderObject->RegisterComponent();
 	(bIsRightEdge ? RightCollider : LeftCollider) = NewColliderObject;
 
-	//NewColliderObject->SetHiddenInGame(false);
-	//FString debug = bIsRightEdge ? "right" : "left";
-	//FString debug2 = ((bIsRightEdge ? RightEdgeState : LeftEdgeState) == Block) ? "block" : "corner";
-	//UE_LOG(LogTemp, Warning, TEXT("Spawn: %s %s"), *debug, *debug2)
+	NewColliderObject->SetHiddenInGame(false);
+
 }
 
 void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -453,14 +479,12 @@ void UParkourMovementComponent::Reset()
 	//Destroying edge collliders if they exist
 	if (LeftCollider)
 	{
-		LeftCollider->UnregisterComponent();
-		LeftCollider->DestroyComponent();
-		LeftCollider = nullptr;
+		LeftCollider->GetOwner()->Destroy();
+		LeftCollider= nullptr;
 	}
 	if (RightCollider)
 	{
-		RightCollider->UnregisterComponent();
-		RightCollider->DestroyComponent();
+		RightCollider->GetOwner()->Destroy();
 		RightCollider = nullptr;
 	}
 }
@@ -511,7 +535,6 @@ void UParkourMovementComponent::SetMovementState(TEnumAsByte<EParkourMovementSta
 		}
 		break;
 	case MSE_Wallrun:
-		UE_LOG(LogTemp, Warning, TEXT("entered"));
 		bUseControllerDesiredRotation = false;
 		GravityScale = 0;
 		break;
@@ -557,7 +580,7 @@ void UParkourMovementComponent::EndNoWallrunTimer()
 bool UParkourMovementComponent::TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection)
 {
 	FRotator TraceRotationOffset = TraceDirectionOffsets.FindRef(TraceDirection);
-	float TraceLength = (TraceDirection == TraceDirection_Up || TraceDirection_Down ? CapsuleHalfHeight + CapsuleRadius : CapsuleRadius * 4);
+	float TraceLength = (TraceDirection == TraceDirection_Up || TraceDirection_Down ? CapsuleHalfHeight + CapsuleRadius : CapsuleRadius * 5);
 	FVector TraceStart = GetOwner()->GetActorLocation();
 	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
 	FHitResult OutputHitResult;
@@ -683,6 +706,7 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 		}
 		return false;
 	case MSE_Hang:
+		if (CurrentHangingState != Hanging) { return false; }
 		JumpOffPoint = LastUpdateLocation;
 		FinishHang();
 		SetMovementState(MSE_Jump);
@@ -735,12 +759,10 @@ bool UParkourMovementComponent::IsFullfillingWallrunConditions()
 	FHitResult * PotentiallyRunnableWallHitResult = DirectionTraceHitResults.Find(PotentialWallrunSide);
 	if (!PotentiallyRunnableWallHitResult) { return false; }
 	FRotator CurrentRotation = (UKismetMathLibrary::FindLookAtRotation(FVector(0, 0, 0), PotentiallyRunnableWallHitResult->ImpactNormal)) + FRotator(0, (PotentialWallrunSide == TraceDirection_Left) ? -90 : 90, 0);
-	/*bool bHasEnoughVelocity = CurrentRotation.UnrotateVector(Velocity).X > 0;
-	if (!bHasEnoughVelocity) { UE_LOG(LogTemp, Warning, TEXT("2")); return false; }*/
+
 	bool bIsHorizontallySteady = (CurrentRotation.UnrotateVector(Velocity).Y * ((PotentialWallrunSide == TraceDirection_Left) ? 1 : -1)) <= 900;
 	if (!bIsHorizontallySteady) { return false; }
-	//FString debug = bIsHorizontallySteady ? "push" : "pull";
-	//UE_LOG(LogTemp, Warning, TEXT("%s"),*debug);
+
 	return true;
 }
 
