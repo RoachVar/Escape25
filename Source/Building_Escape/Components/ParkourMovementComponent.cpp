@@ -299,7 +299,7 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 	{
 		SetMovementState(MSE_Hang);
 		ChangeHangingState(AdjustingLocation);
-		AdjustLocationToHangPosition(HangLocation, HangRotation);
+		AdjustHangLocation(HangLocation, HangRotation, LocationAdjustment);
 		return true;
 	}
 	else
@@ -318,31 +318,16 @@ void UParkourMovementComponent::SetParameters(FVector NewHandSize, float NewGrab
 	AttachHeight = NewAttachHeight;
 }
 
-void UParkourMovementComponent::AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation)
+void UParkourMovementComponent::AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate)
 {
-	if (LocationAdjustment.IsBound())
+	if (TransitionDelegate.IsBound())
 	{
-		LocationAdjustment.Broadcast(HangLocation, HangRotation);
-
+		TransitionDelegate.Broadcast(TargetLocation, TargetRotation);
 	}
 	else
 	{
-		GetOwner()->SetActorLocation(HangLocation);
-		GetOwner()->SetActorRotation(HangRotation);
-		AdjustmentEnded();
-	}
-}
-
-void UParkourMovementComponent::AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation)
-{
-	if (CornerAdjustment.IsBound())
-	{
-		CornerAdjustment.Broadcast(HangLocation, HangRotation);
-	}
-	else
-	{
-		GetOwner()->SetActorLocation(HangLocation);
-		GetOwner()->SetActorRotation(HangRotation);
+		GetOwner()->SetActorLocation(TargetLocation);
+		GetOwner()->SetActorRotation(TargetRotation);
 		AdjustmentEnded();
 	}
 }
@@ -384,15 +369,6 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 		Reset();
 		break;
 	case Hanging:
-		//if (IsValidHangPoint(OUT TargetLocation, OUT TargetRotation, LastUpdateLocation, LastUpdateRotation.Rotator()))
-		//{
-		//	GetOwner()->SetActorLocation(TargetLocation);
-		//	GetOwner()->SetActorRotation(TargetRotation);
-		//}
-		//else
-		//{
-		//	SetMovementState(MSE_Jump);
-		//}
 		TogglePlaneLock(true);
 		GetOwner()->SetActorEnableCollision(true);
 		GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
@@ -466,7 +442,7 @@ void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* Over
 	
 	//Beginning the transition around a corner
 	ChangeHangingState(TraversingACorner);
-	AdjustLocationAroundCorner(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator());
+	AdjustHangLocation(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator(), CornerAdjustment);
 }
 
 void UParkourMovementComponent::Reset()

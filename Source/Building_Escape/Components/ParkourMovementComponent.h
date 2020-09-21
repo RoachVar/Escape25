@@ -75,8 +75,7 @@ public:
 	//END UMovementComponent Interface
 
 // Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
-	void AdjustLocationToHangPosition(FVector HangLocation, FRotator HangRotation);
-	void AdjustLocationAroundCorner(FVector HangLocation, FRotator HangRotation);
+	void AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate);
 
 // Setter and Getter functions for private variables
 	UFUNCTION(BlueprintCallable)
@@ -169,6 +168,9 @@ private:
 
 	UPROPERTY(BlueprintAssignable)
 	FHangingTransitionDelegate CornerAdjustment;
+
+	UPROPERTY(BlueprintAssignable)
+	FHangingTransitionDelegate ClimbUpAdjustment;
 
 	//Spawned colliders that act as triggers for corner transitions are all bound to this function; Differentation between the left and right collider is handled inside the functions implementation
 	UFUNCTION()
