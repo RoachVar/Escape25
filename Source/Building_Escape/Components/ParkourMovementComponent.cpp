@@ -84,7 +84,7 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		}
 		else
 		{
-			bool bHeightBoostPossible = abs(JumpOffPoint.Z - LastUpdateLocation.Z) < 300;
+			bool bHeightBoostPossible = abs(JumpOffPoint.Z - LastUpdateLocation.Z) < 300 && LastUpdateLocation.Z - JumpOffPoint.Z - 300 < 0;
 			Velocity = GetOwner()->GetActorRotation().RotateVector(FVector(1200, BlockedDirections.Contains(TraceDirection_Left) ? -200 : 200, bHeightBoostPossible ? (JumpOffPoint.Z + JumpZVelocity) - LastUpdateLocation.Z : 0));
 			UpdateBlockedDirections();
 		}
@@ -116,6 +116,7 @@ void UParkourMovementComponent::UpdateEdgeStatuses()
 		FRotator OutRotator;
 		float HorizontalOffset = Direction * CapsuleRadius/2;
 		FVector TestedHangLocation = GetActorLocation() + GetOwner()->GetActorRotation().RotateVector(FVector(0, HorizontalOffset, 0));
+	
 		if (IsValidHangPoint(OUT OutVector,OUT OutRotator, TestedHangLocation, GetOwner()->GetActorRotation()))
 		{ continue;	}
 		//Initialising a variable that refers to the pointer of the aproppriate transform variable depending on the direction;
@@ -453,8 +454,6 @@ void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform 
 	NewColliderObject->RegisterComponent();
 	(bIsRightEdge ? RightCollider : LeftCollider) = NewColliderObject;
 
-	NewColliderObject->SetHiddenInGame(false);
-
 }
 
 void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -517,6 +516,15 @@ void UParkourMovementComponent::WallrunTimerEnd()
 void UParkourMovementComponent::SetMovementState(TEnumAsByte<EParkourMovementState> NewState)
 {
 	if (CurrentMovementState == NewState) { return; }
+	
+	switch (CurrentMovementState) {
+	case MSE_Walk:
+		JumpOffPoint = GetOwner()->GetActorLocation();
+		break;
+	default:
+		break;
+	}
+	
 	CurrentMovementState = NewState;
 
 	switch (NewState) {
@@ -570,7 +578,7 @@ void UParkourMovementComponent::EndNoHangTimer()
 
 void UParkourMovementComponent::StartNoWallrunTimer()
 {
-	GetWorld()->GetTimerManager().SetTimer(NoWallrunTimerHandle, this, &UParkourMovementComponent::EndNoWallrunTimer, 0.07, false);
+	GetWorld()->GetTimerManager().SetTimer(NoWallrunTimerHandle, this, &UParkourMovementComponent::EndNoWallrunTimer, 0.01f, false);
 }
 
 void UParkourMovementComponent::EndNoWallrunTimer()
@@ -580,7 +588,7 @@ void UParkourMovementComponent::EndNoWallrunTimer()
 bool UParkourMovementComponent::TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection)
 {
 	FRotator TraceRotationOffset = TraceDirectionOffsets.FindRef(TraceDirection);
-	float TraceLength = (TraceDirection == TraceDirection_Up || TraceDirection_Down ? CapsuleHalfHeight + CapsuleRadius : CapsuleRadius * 5);
+	float TraceLength = (TraceDirection == TraceDirection_Up || TraceDirection_Down ? CapsuleHalfHeight + CapsuleRadius : CapsuleRadius * 6);
 	FVector TraceStart = GetOwner()->GetActorLocation();
 	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
 	FHitResult OutputHitResult;
@@ -596,13 +604,6 @@ bool UParkourMovementComponent::TraceForBlockInDirection(TEnumAsByte<ETraceDirec
 	DirectionTraceHitResults.Add(TraceDirection, OutputHitResult);
 
 	return OutputHitResult.bBlockingHit;
-	/*
-	return GetWorld()->LineTraceTestByChannel(
-		TraceStart,
-		TraceStart + (GetOwner()->GetActorRotation() + TraceRotationOffset).RotateVector(FVector(TraceLength, 0, 0)),
-		ECollisionChannel::ECC_WorldStatic,
-		TraceParams
-	); */
 	
 
 }
@@ -685,7 +686,6 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 			// Don't jump if we can't move up/down.
 			if (!bConstrainToPlane || FMath::Abs(PlaneConstraintNormal.Z) != 1.f)
 			{
-				JumpOffPoint = LastUpdateLocation;
 				Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity);
 				SetMovementMode(MOVE_Falling);
 				return true;
@@ -698,7 +698,6 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 			// Don't jump if we can't move up/down.
 			if (!bConstrainToPlane || FMath::Abs(PlaneConstraintNormal.Z) != 1.f)
 			{
-				JumpOffPoint = LastUpdateLocation;
 				Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity * 2);
 				SetMovementMode(MOVE_Falling);
 				return true;
@@ -707,7 +706,6 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 		return false;
 	case MSE_Hang:
 		if (CurrentHangingState != Hanging) { return false; }
-		JumpOffPoint = LastUpdateLocation;
 		FinishHang();
 		SetMovementState(MSE_Jump);
 		if (GetLastUpdateRotation().Equals(PawnOwner->GetControlRotation(), 90.f))
@@ -723,18 +721,10 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 		SetMovementMode(MOVE_Falling);
 		return true;
 	case MSE_Wallrun:
-		if (false && GetLastUpdateRotation().Equals(PawnOwner->GetControlRotation(), 50.f))
-		{
-			float JumpOffForce = BlockedDirections.Contains(TraceDirection_Left) ? JumpZVelocity : -JumpZVelocity;
-			StartNoWallrunTimer();
-			Velocity = PawnOwner->GetControlRotation().RotateVector(FVector(500, JumpOffForce * 3.8f, FMath::Max(Velocity.Z, (JumpZVelocity * 0.5f))));
-		}
-		else
-		{
-			float JumpOffForce = BlockedDirections.Contains(TraceDirection_Left) ? JumpZVelocity : -JumpZVelocity;
-			StartNoWallrunTimer();
-			Velocity = PawnOwner->GetControlRotation().RotateVector(FVector(1000.0, 0, FMath::Max(Velocity.Z, (JumpZVelocity * 1.5f))));
-		}
+	{float JumpOffForce = BlockedDirections.Contains(TraceDirection_Left) ? JumpZVelocity : -JumpZVelocity;
+	StartNoWallrunTimer();
+	Velocity = PawnOwner->GetControlRotation().RotateVector(FVector(1000.0, 0, FMath::Max(Velocity.Z, (JumpZVelocity * 1.5f))));
+	}
 		SetMovementMode(MOVE_Falling);
 		return true;
 	default:
@@ -752,16 +742,24 @@ bool UParkourMovementComponent::IsFullfillingWallrunConditions()
 {
 	if (!bCanWallrun) {return false;}
 	if (GetWorld()->GetTimerManager().IsTimerActive(NoWallrunTimerHandle)) { return false; }
+	
 	FVector CurrentInputVector = GetLastInputVector();
+	
 	bool bHasEnoughInput = abs(GetLastInputVector().X + GetLastInputVector().Y) > 0;
 	if (!bHasEnoughInput) { return false; }
+
 	TEnumAsByte<ETraceDirection> PotentialWallrunSide = BlockedDirections.Contains(TraceDirection_Left) ? TraceDirection_Left : TraceDirection_Right;
 	FHitResult * PotentiallyRunnableWallHitResult = DirectionTraceHitResults.Find(PotentialWallrunSide);
 	if (!PotentiallyRunnableWallHitResult) { return false; }
+	
 	FRotator CurrentRotation = (UKismetMathLibrary::FindLookAtRotation(FVector(0, 0, 0), PotentiallyRunnableWallHitResult->ImpactNormal)) + FRotator(0, (PotentialWallrunSide == TraceDirection_Left) ? -90 : 90, 0);
+	FVector UnrotatedVelocity = CurrentRotation.UnrotateVector(Velocity);
 
-	bool bIsHorizontallySteady = (CurrentRotation.UnrotateVector(Velocity).Y * ((PotentialWallrunSide == TraceDirection_Left) ? 1 : -1)) <= 900;
+	bool bIsHorizontallySteady = (UnrotatedVelocity.Y * ((PotentialWallrunSide == TraceDirection_Left) ? 1 : -1)) <= 900;
 	if (!bIsHorizontallySteady) { return false; }
+	
+	bool bHasEnoughtForwardMotion = (UnrotatedVelocity.X) >= 1;
+	if (!bHasEnoughtForwardMotion) { return false; }
 
 	return true;
 }
