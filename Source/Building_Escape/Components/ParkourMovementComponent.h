@@ -41,6 +41,8 @@ enum EParkourMovementState
 	MSE_Wallrun   UMETA(DisplayName = "Wallrun"),
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FParkourMovementStateChangedSignature, TEnumAsByte<EParkourMovementState>, PrevMovementState, TEnumAsByte<EParkourMovementState>, NewMovementState);
+
 enum ETraceDirection
 {
 	TraceDirection_Ahead,
@@ -70,9 +72,11 @@ public:
 	virtual bool DoJump(bool bReplayingMoves) override;
 	virtual bool CanAttemptJump() const override;
 
-	//BEGIN UMovementComponent Interface
+	//BEGIN UCharacterMovementComponent Interface
 	virtual bool IsMovingOnGround() const override;
-	//END UMovementComponent Interface
+	virtual bool IsCrouching() const override;
+	virtual bool CanCrouchInCurrentState() const override;
+	//END UCharacterMovementComponent Interface
 
 // Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
 	void AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate);
@@ -86,6 +90,12 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TEnumAsByte<EParkourMovementState> GetMovementState();
+
+	UFUNCTION()
+	void OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode);
+
+	void AttemptCrouch();
+	void AttemptUnCrouch();
 
 private:
 
@@ -172,6 +182,24 @@ private:
 	UPROPERTY(BlueprintAssignable)
 	FHangingTransitionDelegate ClimbUpAdjustment;
 
+	UPROPERTY(BlueprintAssignable)
+	FParkourMovementStateChangedSignature ParkourMovementStateChangedDelegate;
+
+	UPROPERTY(EditAnywhere)
+	float MinSlideSpeed = 800.f;
+
+	UPROPERTY(EditAnywhere)
+	float MinMonkeyJumpSpeed = 200.f;
+
+	UPROPERTY(EditAnywhere)
+	float SlideForce = 800.f;
+
+	UPROPERTY(EditAnywhere)
+	float MonkeyJumpForce = 1200.f;
+
+	UPROPERTY(EditAnywhere)
+	float SlideDuration = 1.f;
+
 	//Spawned colliders that act as triggers for corner transitions are all bound to this function; Differentation between the left and right collider is handled inside the functions implementation
 	UFUNCTION()
 	void EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -182,20 +210,30 @@ private:
 	UFUNCTION(BlueprintCallable)
 	void SetMovementState(TEnumAsByte<EParkourMovementState> NewState);
 
+	UFUNCTION(BlueprintPure, DisplayName = "Is touching left wall")
+	bool GetIsTouchingLeftWall();
+
 	UPROPERTY()
 	bool bIsAirborn = false;
 
+	bool bIsTouchingLeftWall = false;
+
 	float MaxWallrunTime;
+
+
 
 
 	FTimerHandle NoHangTimerHandle;
 	FTimerHandle NoWallrunTimerHandle;
 	FTimerHandle WallrunTimerHandle;
+	FTimerHandle SlideTimerHandle;
 	bool bHangingLocked = false;
 	void StartNoHangTimer();
 	void EndNoHangTimer();
 	void StartNoWallrunTimer();
 	void EndNoWallrunTimer();
+	void StartSlideTimer();
+	void EndSlideTimer();
 	bool TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection);
 	TMap<TEnumAsByte<ETraceDirection>, FRotator> TraceDirectionOffsets;
 	TMap < TEnumAsByte <ETraceDirection> , FHitResult > DirectionTraceHitResults;
@@ -205,8 +243,13 @@ private:
 	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
 	void WallrunTimerStart();
 	void WallrunTimerEnd();
+	void Lunge();
 	bool bCanWallrun = true;
 	FVector JumpOffPoint;
 	bool IsFullfillingWallrunConditions();
+	bool bCanMonkeyJump = true;
+	void ResetToBasicState();
 
+	virtual void Crouch(bool bClientSimulation = false) override;
+	virtual void UnCrouch(bool bClientSimulation = false) override;
 };

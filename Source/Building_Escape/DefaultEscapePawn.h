@@ -33,6 +33,7 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public ACharacter
 	// End Pawn overrides
 
 	// Begin Character overrides
+	virtual void BeginPlay() override;
 	// End Character overrides
 
 	UParkourMovementComponent* GetParkourMovementComponent() const;
@@ -83,20 +84,14 @@ class BUILDING_ESCAPE_API ADefaultEscapePawn : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pawn")
 		float BaseLookUpRate;
 
-//public:
-//	/** Name of the MovementComponent.  Use this name if you want to use a different class (with ObjectInitializer.SetDefaultSubobjectClass). */
-//	static FName MovementComponentName;
-//
-//protected:
-//	/** DefaultPawn movement component */
-//	UPROPERTY(Category = Pawn, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-//		UPawnMovementComponent* MovementComponent;
+	bool bIsRotationLockActive = false;
 
 public:
 
 	/** If true, adds default input bindings for movement and camera look. */
 	UPROPERTY(Category = Pawn, EditAnywhere, BlueprintReadOnly)
 		uint32 bAddDefaultMovementBindings : 1;
+
 
 };
 

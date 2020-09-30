@@ -22,10 +22,11 @@ ADefaultEscapePawn::ADefaultEscapePawn(const FObjectInitializer& ObjectInitializ
 	bReplicates = true;
 	NetPriority = 3.0f;
 
-	BaseEyeHeight = 0.0f;
+	BaseEyeHeight = 50.0f;
+	CrouchedEyeHeight = 30.0f;
+
 	bCollideWhenPlacing = false;
 	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
 
 	//MovementComponent = CreateDefaultSubobject<UPawnMovementComponent, UParkourMovementComponent>(ADefaultEscapePawn::MovementComponentName);
 	//MovementComponent->UpdatedComponent = CollisionComponent;
@@ -34,7 +35,13 @@ ADefaultEscapePawn::ADefaultEscapePawn(const FObjectInitializer& ObjectInitializ
 
 	// This is the default pawn class, we want to have it be able to move out of the box.
 	bAddDefaultMovementBindings = true;
+}
 
+void ADefaultEscapePawn::BeginPlay()
+{
+	Super::BeginPlay();
+
+	MovementModeChangedDelegate.AddUniqueDynamic(GetParkourMovementComponent(), &UParkourMovementComponent::OnMovementModeChangedDelegate);
 }
 
 void InitializeDefaultPawnInputBindings()
@@ -53,6 +60,8 @@ void InitializeDefaultPawnInputBindings()
 		UPlayerInput::AddEngineDefinedAxisMapping(FInputAxisKeyMapping("DefaultPawn_MoveRight", EKeys::A, -1.f));
 		UPlayerInput::AddEngineDefinedAxisMapping(FInputAxisKeyMapping("DefaultPawn_MoveRight", EKeys::D, 1.f));
 		UPlayerInput::AddEngineDefinedAxisMapping(FInputAxisKeyMapping("DefaultPawn_MoveRight", EKeys::Gamepad_LeftX, 1.f));
+		UPlayerInput::AddEngineDefinedAxisMapping(FInputAxisKeyMapping("DefaultPawn_MoveRight", EKeys::D, 1.f));
+		UPlayerInput::AddEngineDefinedActionMapping(FInputActionKeyMapping("Crouch", EKeys::LeftControl));
 
 		// HACK: Android controller bindings in ini files seem to not work
 		//  Direct overrides here some to work
@@ -95,6 +104,8 @@ void ADefaultEscapePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		PlayerInputComponent->BindAxis("DefaultPawn_TurnRate", this, &ADefaultEscapePawn::TurnAtRate);
 		PlayerInputComponent->BindAxis("DefaultPawn_LookUp", this, &ADefaultEscapePawn::AddControllerPitchInput);
 		PlayerInputComponent->BindAxis("DefaultPawn_LookUpRate", this, &ADefaultEscapePawn::LookUpAtRate);
+		PlayerInputComponent->BindAction("Crouch", IE_Pressed, GetParkourMovementComponent(), &UParkourMovementComponent::AttemptCrouch);
+		PlayerInputComponent->BindAction("Crouch", IE_Released, GetParkourMovementComponent(), &UParkourMovementComponent::AttemptUnCrouch);
 	}
 }
 
