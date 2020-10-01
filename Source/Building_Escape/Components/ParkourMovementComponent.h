@@ -222,7 +222,7 @@ private:
 
 
 
-
+	//Handles of timers used by the parkour mechanics
 	FTimerHandle NoHangTimerHandle;
 	FTimerHandle NoWallrunTimerHandle;
 	FTimerHandle WallrunTimerHandle;

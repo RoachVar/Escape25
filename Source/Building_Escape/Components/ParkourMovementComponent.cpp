@@ -55,7 +55,6 @@ void UParkourMovementComponent::BeginPlay()
 
 void UParkourMovementComponent::OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
-	if (CurrentMovementState == MSE_Hang) { return; }
 	ResetToBasicState();
 }
 
@@ -103,6 +102,7 @@ void UParkourMovementComponent::UnCrouch(bool bClientSimulation)
 
 void UParkourMovementComponent::ResetToBasicState()
 {
+	if (CurrentMovementState == MSE_Hang && CurrentHangingState != NotHanging) { return; }
 	switch (MovementMode) {
 	case MOVE_Walking:
 		if (IsCrouching())
@@ -426,6 +426,7 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 	case NotHanging:
 		StartNoHangTimer();
 		TogglePlaneLock(false);
+		SetMovementMode(MOVE_Falling);
 		GravityScale = 1;
 		Reset();
 		break;
@@ -634,7 +635,7 @@ TEnumAsByte<EParkourMovementState> UParkourMovementComponent::GetMovementState()
 void UParkourMovementComponent::StartNoHangTimer()
 {
 	bHangingLocked = true;
-	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.1f, false);
+	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.50f, false);
 }
 
 void UParkourMovementComponent::EndNoHangTimer()
