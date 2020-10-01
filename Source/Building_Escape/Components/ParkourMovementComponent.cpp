@@ -55,6 +55,7 @@ void UParkourMovementComponent::BeginPlay()
 
 void UParkourMovementComponent::OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
+	if (CurrentMovementState == MSE_Hang && CurrentHangingState != NotHanging) { return; }
 	ResetToBasicState();
 }
 
@@ -102,7 +103,6 @@ void UParkourMovementComponent::UnCrouch(bool bClientSimulation)
 
 void UParkourMovementComponent::ResetToBasicState()
 {
-	if (CurrentMovementState == MSE_Hang && CurrentHangingState != NotHanging) { return; }
 	switch (MovementMode) {
 	case MOVE_Walking:
 		if (IsCrouching())
@@ -552,7 +552,7 @@ void UParkourMovementComponent::WallrunTimerEnd()
 {
 	GetWorld()->GetTimerManager().ClearTimer(WallrunTimerHandle);
 	bCanWallrun = false;
-	if (CurrentMovementState = MSE_Wallrun)
+	if (CurrentMovementState == MSE_Wallrun)
 	{
 		ResetToBasicState();
 	}
@@ -744,7 +744,7 @@ void UParkourMovementComponent::OnDirectionOverlapEnd(TEnumAsByte<ETraceDirectio
 		break;
 	case TraceDirection_Left:
 	case TraceDirection_Right:
-		if (!BlockedDirections.Contains(TraceDirection_Left) && !BlockedDirections.Contains(TraceDirection_Right))
+		if (CurrentMovementState == MSE_Wallrun && !BlockedDirections.Contains(TraceDirection_Left) && !BlockedDirections.Contains(TraceDirection_Right))
 		{
 			ResetToBasicState();
 		}
