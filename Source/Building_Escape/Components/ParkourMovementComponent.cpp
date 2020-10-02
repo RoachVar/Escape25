@@ -20,7 +20,7 @@ UParkourMovementComponent::UParkourMovementComponent()
 	NavAgentProps.bCanCrouch = true;
 	bCrouchMaintainsBaseLocation = false;
 	bUseSeparateBrakingFriction = true;
-	BrakingFriction = 0.f;
+	BrakingFriction = 200.f;
 	
 
 }
@@ -576,11 +576,13 @@ void UParkourMovementComponent::SetMovementState(TEnumAsByte<EParkourMovementSta
 	{
 		bUseControllerDesiredRotation = false;
 		CharacterOwner->bUseControllerRotationYaw = false;
+		BrakingFriction = 0.f;
 	}
 	else
 	{
 		bUseControllerDesiredRotation = true;
 		CharacterOwner->bUseControllerRotationYaw = true;
+		BrakingFriction = 200.f;
 	}
 
 	switch (NewState) {
