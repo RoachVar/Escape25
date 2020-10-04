@@ -227,6 +227,7 @@ private:
 	FTimerHandle NoWallrunTimerHandle;
 	FTimerHandle WallrunTimerHandle;
 	FTimerHandle SlideTimerHandle;
+
 	bool bHangingLocked = false;
 	void StartNoHangTimer();
 	void EndNoHangTimer();
@@ -241,10 +242,9 @@ private:
 	void UpdateBlockedDirections();
 	void OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection);
 	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
-	void WallrunTimerStart();
-	void WallrunTimerEnd();
+	void StartWallrunTimer();
+	void EndWallrunTimer();
 	void Lunge();
-	bool bCanWallrun = true;
 	FVector JumpOffPoint;
 	bool IsFullfillingWallrunConditions();
 	bool bCanMonkeyJump = true;
