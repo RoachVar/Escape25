@@ -78,15 +78,10 @@ public:
 	virtual bool CanCrouchInCurrentState() const override;
 	//END UCharacterMovementComponent Interface
 
-// Overridable functions that are called when a transition to hanging or across a corner occurs. The default implementations just teleport the player
+	/*A function that is called when a transition to hanging or across a corner, etc occurs. The default implementation just teleport the player. 
+	The default implementation will be skipped if the delegate that was passed in bound*/
 	void AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate);
-
-// Setter and Getter functions for private variables
-	UFUNCTION(BlueprintCallable)
-	void SetIsAirborn(bool bNewIsAirborn);
-
-	UFUNCTION(BlueprintPure)
-	bool GetIsAirborn();
+	//If overriding this function, the designer is responsible for calling AdjustmentedEnded() manually
 
 	UFUNCTION(BlueprintPure)
 	TEnumAsByte<EParkourMovementState> GetMovementState();
@@ -94,13 +89,13 @@ public:
 	UFUNCTION()
 	void OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode);
 
+	//Functions triggered by the player when pressing/releasing the crouch input. AttemptCrouch decides if the player character should perform any special moves(depending on the current ParkourMovementState)
 	void AttemptCrouch();
 	void AttemptUnCrouch();
 
 private:
 
-	// Parameters that define the rules of testing hangability and attachment. Values can be overriden from blueprint through an appropriate function
-	
+// Parameters that define the rules of testing hangability and attachment. Values can be overriden from blueprint through an appropriate function	
 	// Siza of box trace that is performed just above the potential edge to check if there is sufficient empty space
 	FVector HandSize;
 	// Vertical distance from player pivot at which the test is performed
@@ -111,14 +106,13 @@ private:
 	float AttachHeight;
 	// Forward distance between the player pivot and the wall the player is hanging on
 	float AttachDistance;
-//
-	// Pointers to the owners root capsule and movement component; assigned in BeginPlay
-	UCapsuleComponent* PawnsRootPrimitive = nullptr;
-	UPawnMovementComponent* PawnsMovementComponent = nullptr;
+
 	// Dimensions of the player capsule; set in BeginPlay
 	float CapsuleRadius;
 	float CapsuleHalfHeight;
 
+//Begin Hang system
+//Internal variables
 	// Enumerators that stores the current status of horizontal edges(extremes of the wall that the player is currently hanging on) that decide in which way the edges will be interacted with(block or corner transition)
 	TEnumAsByte<EEdgeState> LeftEdgeState = Unknown;
 	TEnumAsByte<EEdgeState> RightEdgeState = Unknown;
@@ -128,48 +122,38 @@ private:
 	// Transform variables that store the location and rotation(Scale is always set to 1,1,1) the player will be blended to after traversing the respecitve corner. If the edge is non-traversable, the respective variable is not used.
 	FTransform LeftEdgeTargetTransform;
 	FTransform RightEdgeTargetTransform;
-
-	// Performs several traces that verify if the location and rotation passed can be projected to a fully valid hanging spot. The out parameters are only assigned when the function returns true
-	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const;
-
-	// Locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
-	void TogglePlaneLock(bool bNewIsLocked);
-
-	// This value signifies which procedure that forms the hanging system is currently underway. It should be assigned only using the function below
+	// Signifies which particular procedure the hanging system is currently performing. It should be assigned only using the function below
 	TEnumAsByte<EHangingState> CurrentHangingState;
 
+//Interntal functions
 	// Assigns the value passed to CurrentHangingState in and then applies effects specific to the new state
 	void ChangeHangingState(TEnumAsByte<EHangingState> NewHangingState);
-
-	//Tries to detect a corner or blockage in every direction(inner left, outer left, inner right, outer right) and sets the EdgeState variables accordingly, as well as calls SpawnEdgeCollider when necessary
+	// Performs several traces that verify if the location and rotation passed can be projected to a fully valid hanging spot. The out parameters are only assigned when the function returns true
+	bool IsValidHangPoint(OUT FVector& OutHangLocation, OUT FRotator& OutHangRotation, FVector InOriginLocation, FRotator InOriginRotation) const;
+	// Locks the player movement to the plane to the pawns sides or reverts that lock, depending on the bool passed in
+	void TogglePlaneLock(bool bNewIsLocked);
+	// Tries to detect a corner or blockage in every direction(inner left, outer left, inner right, outer right) and sets the EdgeState variables accordingly, as well as calls SpawnEdgeCollider when necessary
 	void UpdateEdgeStatuses();
-
-	//Triggers IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true. Called several times by UpdateEdgeStatuses
+	// Calls IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true. Called several times by UpdateEdgeStatuses
 	bool TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform& OutTransform) const;
-
 	// Collider boxes are spawned to represent an interaction with an edge - they act as blocking volumes when the edge is non-traversable and as triggers if a corner transition is expected
 	void SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform);
-
 	// This function destroys any spawned colliders and resets the EdgeStatus variables to "Unknown". It is triggering when ceasing to hang altogether or when transitioning to a new plane
-	void Reset();
+	void ResetHangingColliders();
 
-	//Overrides default detection and attachment parameters with custom values
-	UFUNCTION(BlueprintCallable)
-	void SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight);
-
-	//Called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
+	// Called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
 	UFUNCTION(BlueprintCallable)
 	void AdjustmentEnded();
 
-	//Triggers IsValidHangPoint with the current location and rotation passed in and begins hanging at the returned transform if the check returned true; Call this to attempt hanging
+	// Calls IsValidHangPoint with the current location and rotation passed in and begins hanging at the returned transform if the check returned true; Call this to attempt hanging
 	UFUNCTION(BlueprintCallable)
 	bool TryToHangInCurrentLocation();
 
-	//Ceases the hanging altogether. Call to exit hang
+	// Ceases the hanging altogether. Call to exit hang
 	UFUNCTION(BlueprintCallable)
 	void FinishHang();
 
-	//A dispatcher that triggers wherever the CurrentHangingState changes from NotHanging to any other state or the reverse. It returns a bool that signifies wherever the new state is NotHanging or any other state.
+	//Delegates intended to be passed into the AdjustHangLocation function, used to differentiate between the various types of transition
 	UPROPERTY(BlueprintAssignable)
 	FGrabStateChangedDelegate HangingStateChanged;
 
@@ -181,6 +165,7 @@ private:
 
 	UPROPERTY(BlueprintAssignable)
 	FHangingTransitionDelegate ClimbUpAdjustment;
+//End hang system
 
 	UPROPERTY(BlueprintAssignable)
 	FParkourMovementStateChangedSignature ParkourMovementStateChangedDelegate;
@@ -207,49 +192,59 @@ private:
 	UPROPERTY()
 	TEnumAsByte<EParkourMovementState> CurrentMovementState;
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION()
 	void SetParkourState(TEnumAsByte<EParkourMovementState> NewState);
 
 	UFUNCTION(BlueprintPure, DisplayName = "Is touching left wall")
 	bool GetIsTouchingLeftWall();
 
-	UPROPERTY()
-	bool bIsAirborn = false;
+	UPROPERTY(EditAnywhere)
+	float MaxWallrunTime; // Duration of WallrunTimerHandle
 
-	bool bIsTouchingLeftWall = false;
-
-	float MaxWallrunTime;
-
-
-
+	//UCharacterMovementComponent overrides
+	virtual void Crouch(bool bClientSimulation = false) override;
+	virtual void UnCrouch(bool bClientSimulation = false) override;
+	
 	//Handles of timers used by the parkour mechanics
 	FTimerHandle NoHangTimerHandle;
 	FTimerHandle NoWallrunTimerHandle;
 	FTimerHandle WallrunTimerHandle;
 	FTimerHandle SlideTimerHandle;
 
-	bool bHangingLocked = false;
+	//Start and Stop functions for the timers
 	void StartNoHangTimer();
 	void EndNoHangTimer();
 	void StartNoWallrunTimer();
 	void EndNoWallrunTimer();
 	void StartSlideTimer();
 	void EndSlideTimer();
-	bool TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection);
-	TMap<TEnumAsByte<ETraceDirection>, FRotator> TraceDirectionOffsets;
-	TMap < TEnumAsByte <ETraceDirection> , FHitResult > DirectionTraceHitResults;
-	TArray<TEnumAsByte<ETraceDirection>> BlockedDirections;
-	void UpdateBlockedDirections();
-	void OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection);
-	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
 	void StartWallrunTimer();
 	void EndWallrunTimer();
-	void Lunge();
-	FVector JumpOffPoint;
-	bool IsFullfillingWallrunConditions();
-	bool bCanTuckJump = true;
-	void ResetToBasicState();
 
-	virtual void Crouch(bool bClientSimulation = false) override;
-	virtual void UnCrouch(bool bClientSimulation = false) override;
+	//Checks for overlap for each value of ETraceDirection
+	void UpdateBlockedDirections();
+	//Returns if a trace in given direction results in overlap; used inside the function above
+	bool TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection);
+	//Map of rotation offsets, set once in BeginPlay
+	TMap<TEnumAsByte<ETraceDirection>, FRotator> TraceDirectionOffsets;
+	//Map containing the last result of traces done by UpdateBlockedDirections();
+	TMap < TEnumAsByte <ETraceDirection> , FHitResult > DirectionTraceHitResults;
+	//functions triggered when UpdateBlockedDirections() starts and stops overallping a direction
+	void OnDirectionOverlap(TEnumAsByte<ETraceDirection> TraceDirection);
+	void OnDirectionOverlapEnd(TEnumAsByte<ETraceDirection> TraceDirection);
+	
+	//A series of conditions that must al lreturn true if wallruning is to begin/continue
+	bool IsFullfillingWallrunConditions();
+	//Decides wherever performing a Tuck Jump should boost the players forward velocity(which should be possible only once per jump)
+	bool bCanAirBoost = true;
+	
+	//Performs a jump with strong forward motion relative to control rotation
+	void Lunge();
+
+	//Player location before the last jump
+	FVector JumpOffPoint;
+
+	//Sets parkour movement state to Walk, Crawl or Jump according to MovementMode; used to transition out of special move states
+	void ResetToBasicParkourState();
+
 };

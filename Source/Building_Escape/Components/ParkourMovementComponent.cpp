@@ -31,9 +31,7 @@ void UParkourMovementComponent::BeginPlay()
 	Super::BeginPlay();
 	MaxWallrunTime = 2;
 	SetComponentTickEnabled(true);
-	PawnsRootPrimitive = (UCapsuleComponent*)(GetOwner()->GetRootComponent());
-	PawnsMovementComponent = (UPawnMovementComponent*)this;
-	PawnsRootPrimitive->GetScaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
+	((UCapsuleComponent*)(GetOwner()->GetRootComponent()))->GetScaledCapsuleSize(OUT CapsuleRadius, OUT CapsuleHalfHeight);
 
 	HandSize = FVector(5, 15, 1);
 	// Vertical distance from player pivot at which the test is performed
@@ -63,7 +61,7 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		break;
 	case ParkourState_Jump:
 		UpdateBlockedDirections();
-		if (bHangingLocked) { return; }
+		if (GetWorld()->GetTimerManager().IsTimerActive(NoHangTimerHandle)) { return; }
 		TryToHangInCurrentLocation();
 		break;
 	case ParkourState_Hang:
@@ -77,12 +75,12 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 	case ParkourState_Wallrun:
 		if (!IsFullfillingWallrunConditions())
 		{
-			ResetToBasicState();
+			ResetToBasicParkourState();
 		}
 		else
 		{
 			bool bHeightBoostPossible = abs(JumpOffPoint.Z - LastUpdateLocation.Z) < 300 && LastUpdateLocation.Z - JumpOffPoint.Z - 300 < 0;
-			Velocity = GetOwner()->GetActorRotation().RotateVector(FVector(1200, BlockedDirections.Contains(TraceDirection_Left) ? -200 : 200, bHeightBoostPossible ? (JumpOffPoint.Z + JumpZVelocity) - LastUpdateLocation.Z : 0));
+			Velocity = GetOwner()->GetActorRotation().RotateVector(FVector(1200, DirectionTraceHitResults.Contains(TraceDirection_Left) ? -200 : 200, bHeightBoostPossible ? (JumpOffPoint.Z + JumpZVelocity) - LastUpdateLocation.Z : 0));
 			UpdateBlockedDirections();
 		}
 		break;
@@ -93,7 +91,7 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 void UParkourMovementComponent::OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	if (CurrentMovementState == ParkourState_Hang && CurrentHangingState != NotHanging) { return; }
-	ResetToBasicState();
+	ResetToBasicParkourState();
 }
 
 void UParkourMovementComponent::AttemptCrouch()
@@ -129,16 +127,16 @@ void UParkourMovementComponent::AttemptUnCrouch()
 void UParkourMovementComponent::Crouch(bool bClientSimulation)
 {
 	Super::Crouch(bClientSimulation);
-	ResetToBasicState();
+	ResetToBasicParkourState();
 }
 
 void UParkourMovementComponent::UnCrouch(bool bClientSimulation)
 {
 	Super::UnCrouch(bClientSimulation);
-	ResetToBasicState();
+	ResetToBasicParkourState();
 }
 
-void UParkourMovementComponent::ResetToBasicState()
+void UParkourMovementComponent::ResetToBasicParkourState()
 {
 	switch (MovementMode) {
 	case MOVE_Walking:
@@ -380,15 +378,6 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 	}
 }
 
-void UParkourMovementComponent::SetParameters(FVector NewHandSize, float NewGrabHeight, float NewGrabbingReach, float NewAttachDistance, float NewAttachHeight)
-{
-	HandSize = NewHandSize;
-	GrabHeight = NewGrabHeight;
-	GrabbingReach = NewGrabbingReach;
-	AttachDistance = NewAttachDistance;
-	AttachHeight = NewAttachHeight;
-}
-
 void UParkourMovementComponent::AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate)
 {
 	if (TransitionDelegate.IsBound())
@@ -430,7 +419,7 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 		TogglePlaneLock(false);
 		SetMovementMode(MOVE_Falling);
 		GravityScale = 1;
-		Reset();
+		ResetHangingColliders();
 		break;
 	case AdjustingLocation:
 		GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
@@ -438,7 +427,7 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 		Velocity = FVector(0, 0, 0);
 	case TraversingACorner:
 		GetOwner()->SetActorEnableCollision(false);
-		Reset();
+		ResetHangingColliders();
 		break;
 	case Hanging:
 		TogglePlaneLock(true);
@@ -462,7 +451,6 @@ void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked)
 		SetPlaneConstraintAxisSetting(EPlaneConstraintAxisSetting::Y);
 		SetPlaneConstraintNormal(GetOwner()->GetActorRotation().RotateVector(FVector(1,0,0)));
 		SetPlaneConstraintEnabled(true);
-		//PawnsRootPrimitive->SetConstraintMode(EDOFMode::XYPlane);
 	}
 	else
 	{
@@ -473,7 +461,7 @@ void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked)
 void UParkourMovementComponent::FinishHang()
 {
 	ChangeHangingState(NotHanging);
-	ResetToBasicState();
+	ResetToBasicParkourState();
 }
 
 void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform)
@@ -516,7 +504,7 @@ void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* Over
 	AdjustHangLocation(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator(), CornerAdjustment);
 }
 
-void UParkourMovementComponent::Reset()
+void UParkourMovementComponent::ResetHangingColliders()
 {
 	//Setting edge status enums to the default statE
 	LeftEdgeState = Unknown;
@@ -535,16 +523,6 @@ void UParkourMovementComponent::Reset()
 	}
 }
 
-void UParkourMovementComponent::SetIsAirborn(bool bNewIsAirborn)
-{
-	bIsAirborn = bNewIsAirborn;
-}
-
-bool UParkourMovementComponent::GetIsAirborn()
-{
-	return bIsAirborn;
-}
-
 void UParkourMovementComponent::StartWallrunTimer()
 {
 	GetWorld()->GetTimerManager().ClearTimer(WallrunTimerHandle);
@@ -556,7 +534,7 @@ void UParkourMovementComponent::EndWallrunTimer()
 	WallrunTimerHandle.Invalidate();
 	if (CurrentMovementState == ParkourState_Wallrun)
 	{
-		ResetToBasicState();
+		ResetToBasicParkourState();
 	}
 }
 
@@ -592,7 +570,7 @@ void UParkourMovementComponent::SetParkourState(TEnumAsByte<EParkourMovementStat
 	switch (NewState) {
 	case ParkourState_Walk:
 		GravityScale = 1;
-		bCanTuckJump = true;
+		bCanAirBoost = true;
 		break;
 	case ParkourState_Jump:
 		GravityScale = 1;
@@ -603,11 +581,11 @@ void UParkourMovementComponent::SetParkourState(TEnumAsByte<EParkourMovementStat
 		break;
 	case ParkourState_Wallrun:
 		GravityScale = 0;
-		bCanTuckJump = true;
+		bCanAirBoost = true;
 		break;
 	case ParkourState_Hang:
 		bWantsToCrouch = false;
-		bCanTuckJump = true;
+		bCanAirBoost = true;
 		SetMovementMode(MOVE_Flying);
 		break;
 	case ParkourState_Slide:
@@ -615,9 +593,9 @@ void UParkourMovementComponent::SetParkourState(TEnumAsByte<EParkourMovementStat
 		StartSlideTimer();
 		break;
 	case ParkourState_TuckJump:
-		if (bCanTuckJump) 
+		if (bCanAirBoost) 
 		{
-			bCanTuckJump = false;
+			bCanAirBoost = false;
 			Velocity += LastUpdateRotation.RotateVector(FVector(TuckJumpForwardForce, 0.f, 0.f));
 		}
 		break;
@@ -636,13 +614,13 @@ TEnumAsByte<EParkourMovementState> UParkourMovementComponent::GetMovementState()
 
 void UParkourMovementComponent::StartNoHangTimer()
 {
-	bHangingLocked = true;
+	GetWorld()->GetTimerManager().ClearTimer(NoHangTimerHandle);
 	GetWorld()->GetTimerManager().SetTimer(NoHangTimerHandle, this, &UParkourMovementComponent::EndNoHangTimer, 0.50f, false);
 }
 
 void UParkourMovementComponent::EndNoHangTimer()
 {
-	bHangingLocked = false;
+ //Empty by design
 }
 
 void UParkourMovementComponent::StartSlideTimer()
@@ -655,7 +633,7 @@ void UParkourMovementComponent::EndSlideTimer()
 {
 	if (CurrentMovementState == ParkourState_Slide)
 	{
-		ResetToBasicState();
+		ResetToBasicParkourState();
 	}
 }
 
@@ -667,6 +645,7 @@ void UParkourMovementComponent::StartNoWallrunTimer()
 
 void UParkourMovementComponent::EndNoWallrunTimer()
 {
+	//Empty by design
 }
 
 bool UParkourMovementComponent::TraceForBlockInDirection(TEnumAsByte<ETraceDirection> TraceDirection)
@@ -700,13 +679,12 @@ void UParkourMovementComponent::UpdateBlockedDirections()
 		if (TraceForBlockInDirection(TraceDirection))
 		{
 			OnDirectionOverlap(TraceDirection);
-			BlockedDirections.AddUnique(TraceDirection);
 		}
 		else
 		{
-			if (BlockedDirections.Contains(TraceDirection))
+			if (DirectionTraceHitResults.Contains(TraceDirection))
 			{
-				BlockedDirections.Remove(TraceDirection);
+				DirectionTraceHitResults.Remove(TraceDirection);
 				OnDirectionOverlapEnd(TraceDirection);
 			}
 		}
@@ -721,7 +699,7 @@ void UParkourMovementComponent::OnDirectionOverlap(TEnumAsByte<ETraceDirection> 
 		case TraceDirection_Ahead:
 			if (CurrentMovementState == ParkourState_Wallrun)
 			{
-				ResetToBasicState();
+				ResetToBasicParkourState();
 			}
 			break;
 		case TraceDirection_Left:
@@ -734,7 +712,7 @@ void UParkourMovementComponent::OnDirectionOverlap(TEnumAsByte<ETraceDirection> 
 		case TraceDirection_Down:
 			if (CurrentMovementState == ParkourState_Wallrun)
 			{
-				ResetToBasicState();
+				ResetToBasicParkourState();
 			}
 				break;
 	}
@@ -747,9 +725,9 @@ void UParkourMovementComponent::OnDirectionOverlapEnd(TEnumAsByte<ETraceDirectio
 		break;
 	case TraceDirection_Left:
 	case TraceDirection_Right:
-		if (CurrentMovementState == ParkourState_Wallrun && !BlockedDirections.Contains(TraceDirection_Left) && !BlockedDirections.Contains(TraceDirection_Right))
+		if (CurrentMovementState == ParkourState_Wallrun && !DirectionTraceHitResults.Contains(TraceDirection_Left) && !DirectionTraceHitResults.Contains(TraceDirection_Right))
 		{
-			ResetToBasicState();
+			ResetToBasicParkourState();
 		}
 			break;
 	}
@@ -838,7 +816,7 @@ bool UParkourMovementComponent::IsFullfillingWallrunConditions()
 	bool bHasEnoughInput = abs(GetLastInputVector().X + GetLastInputVector().Y) > 0;
 	if (!bHasEnoughInput) { return false; }
 
-	TEnumAsByte<ETraceDirection> PotentialWallrunSide = BlockedDirections.Contains(TraceDirection_Left) ? TraceDirection_Left : TraceDirection_Right;
+	TEnumAsByte<ETraceDirection> PotentialWallrunSide = DirectionTraceHitResults.Contains(TraceDirection_Left) ? TraceDirection_Left : TraceDirection_Right;
 	FHitResult * PotentiallyRunnableWallHitResult = DirectionTraceHitResults.Find(PotentialWallrunSide);
 	if (!PotentiallyRunnableWallHitResult) { return false; }
 	
@@ -868,7 +846,7 @@ bool UParkourMovementComponent::IsCrouching() const
 
 bool UParkourMovementComponent::GetIsTouchingLeftWall()
 {
-	return BlockedDirections.Contains(TraceDirection_Left);
+	return DirectionTraceHitResults.Contains(TraceDirection_Left);
 }
 
 bool UParkourMovementComponent::CanCrouchInCurrentState() const
