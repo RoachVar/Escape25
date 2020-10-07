@@ -32,16 +32,16 @@ enum EEdgeState
 UENUM(BlueprintType)
 enum EParkourMovementState
 {
-	MSE_Walk   UMETA(DisplayName = "Walk"),
-	MSE_Crawl   UMETA(DisplayName = "Crawl"),
-	MSE_Slide   UMETA(DisplayName = "Slide"),
-	MSE_Jump   UMETA(DisplayName = "Jump"),
-	MSE_Kong   UMETA(DisplayName = "Kong"),
-	MSE_Hang   UMETA(DisplayName = "Hang"),
-	MSE_Wallrun   UMETA(DisplayName = "Wallrun"),
+	ParkourState_Walk   UMETA(DisplayName = "Walk"),
+	ParkourState_Crawl   UMETA(DisplayName = "Crawl"),
+	ParkourState_Slide   UMETA(DisplayName = "Slide"),
+	ParkourState_Jump   UMETA(DisplayName = "Jump"),
+	ParkourState_TuckJump   UMETA(DisplayName = "TuckJump"),
+	ParkourState_Hang   UMETA(DisplayName = "Hang"),
+	ParkourState_Wallrun   UMETA(DisplayName = "Wallrun"),
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FParkourMovementStateChangedSignature, TEnumAsByte<EParkourMovementState>, PrevMovementState, TEnumAsByte<EParkourMovementState>, NewMovementState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FParkourMovementStateChangedSignature, TEnumAsByte<EParkourMovementState>, PrevParkourState, TEnumAsByte<EParkourMovementState>, NewParkourState);
 
 enum ETraceDirection
 {
@@ -189,13 +189,13 @@ private:
 	float MinSlideSpeed = 800.f;
 
 	UPROPERTY(EditAnywhere)
-	float MinMonkeyJumpSpeed = 200.f;
+	float MinTuckJumpSpeed = 200.f;
 
 	UPROPERTY(EditAnywhere)
 	float SlideForce = 800.f;
 
 	UPROPERTY(EditAnywhere)
-	float MonkeyJumpForce = 1200.f;
+	float TuckJumpForwardForce = 1200.f;
 
 	UPROPERTY(EditAnywhere)
 	float SlideDuration = 1.f;
@@ -208,7 +208,7 @@ private:
 	TEnumAsByte<EParkourMovementState> CurrentMovementState;
 
 	UFUNCTION(BlueprintCallable)
-	void SetMovementState(TEnumAsByte<EParkourMovementState> NewState);
+	void SetParkourState(TEnumAsByte<EParkourMovementState> NewState);
 
 	UFUNCTION(BlueprintPure, DisplayName = "Is touching left wall")
 	bool GetIsTouchingLeftWall();
@@ -247,7 +247,7 @@ private:
 	void Lunge();
 	FVector JumpOffPoint;
 	bool IsFullfillingWallrunConditions();
-	bool bCanMonkeyJump = true;
+	bool bCanTuckJump = true;
 	void ResetToBasicState();
 
 	virtual void Crouch(bool bClientSimulation = false) override;
