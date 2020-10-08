@@ -15,18 +15,18 @@ class UCapsuleComponent;
 //Enumarator that signifies the current state of hanging; used only internally
 enum EHangingState
 {
-	NotHanging,
-	AdjustingLocation,
-	Hanging,
-	TraversingACorner
+	HangingState_NotHanging,
+	HangingState_AdjustingLocation,
+	HangingState_Hanging,
+	HangingState_TraversingACorner
 };
 
 //Enumerator that signifies the current state of the edges on the left and right extremes of the curernt hanging plane; used only internally
 enum EEdgeState
 {
-	Unknown,
-	Block,
-	Corner,
+	EdgeState_Unknown,
+	EdgeState_Block,
+	EdgeState_Corner,
 };
 
 UENUM(BlueprintType)
@@ -43,6 +43,7 @@ enum EParkourMovementState
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FParkourMovementStateChangedSignature, TEnumAsByte<EParkourMovementState>, PrevParkourState, TEnumAsByte<EParkourMovementState>, NewParkourState);
 
+//Enumerator identify directions relative to the player; used only internally
 enum ETraceDirection
 {
 	TraceDirection_Ahead,
@@ -113,16 +114,16 @@ private:
 
 //Begin Hang system
 //Internal variables
-	// Enumerators that stores the current status of horizontal edges(extremes of the wall that the player is currently hanging on) that decide in which way the edges will be interacted with(block or corner transition)
-	TEnumAsByte<EEdgeState> LeftEdgeState = Unknown;
-	TEnumAsByte<EEdgeState> RightEdgeState = Unknown;
-	// Pointers to collider boxes responsible for edge interactions. The colliders are spawned(and destroyed) in runtime and act as blocking volumes or triggers depending on the edge status.
+	// Enumerators that store the current status of horizontal edges(extremes of the wall that the player is currently hanging on) that decide in which way the edges will be interacted with(block or corner transition)
+	TEnumAsByte<EEdgeState> LeftEdgeState = EdgeState_Unknown;
+	TEnumAsByte<EEdgeState> RightEdgeState = EdgeState_Unknown;
+	// Pointers to collider boxes that are responsible for edge interactions. The colliders are spawned(and destroyed) in runtime and act as blocking volumes or triggers depending on the edge status.
 	UBoxComponent* LeftCollider = nullptr;
 	UBoxComponent* RightCollider = nullptr;
 	// Transform variables that store the location and rotation(Scale is always set to 1,1,1) the player will be blended to after traversing the respecitve corner. If the edge is non-traversable, the respective variable is not used.
 	FTransform LeftEdgeTargetTransform;
 	FTransform RightEdgeTargetTransform;
-	// Signifies which particular procedure the hanging system is currently performing. It should be assigned only using the function below
+	// Signifies which particular procedure the hanging system is currently performing. It should be assigned only using the ChangeHangingState function
 	TEnumAsByte<EHangingState> CurrentHangingState;
 
 //Interntal functions
@@ -136,7 +137,7 @@ private:
 	void UpdateEdgeStatuses();
 	// Calls IsValidHangPoint on a location offset depending on the bools passed in. Assigns the out paramater only when returning true. Called several times by UpdateEdgeStatuses
 	bool TestEdgeForCorner(bool bIsEdgeToTheRight, bool bTestForOuterEdge, OUT FTransform& OutTransform) const;
-	// Collider boxes are spawned to represent an interaction with an edge - they act as blocking volumes when the edge is non-traversable and as triggers if a corner transition is expected
+	// Spawnes a collider box that represents an interaction with an edge - it act as blocking volumes when the appropriate EdgeState edge is set to _Block and as triggers if it's set to _Corner
 	void SpawnEdgeCollider(bool bIsRightEdge, FTransform SpawnTransform);
 	// This function destroys any spawned colliders and resets the EdgeStatus variables to "Unknown". It is triggering when ceasing to hang altogether or when transitioning to a new plane
 	void ResetHangingColliders();
@@ -185,7 +186,7 @@ private:
 	UPROPERTY(EditAnywhere)
 	float SlideDuration = 1.f;
 
-	//Spawned colliders that act as triggers for corner transitions are all bound to this function; Differentation between the left and right collider is handled inside the functions implementation
+	//Spawned colliders that act as triggers for corner transitions are all bound to this function; Differentation between the left and right collider is handled inside the implementation
 	UFUNCTION()
 	void EdgeOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 

@@ -65,7 +65,7 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		TryToHangInCurrentLocation();
 		break;
 	case ParkourState_Hang:
-		if (CurrentHangingState != Hanging)
+		if (CurrentHangingState != HangingState_Hanging)
 		{
 			return;
 		}
@@ -90,7 +90,7 @@ void UParkourMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 
 void UParkourMovementComponent::OnMovementModeChangedDelegate(class ACharacter* Character, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
-	if (CurrentMovementState == ParkourState_Hang && CurrentHangingState != NotHanging) { return; }
+	if (CurrentMovementState == ParkourState_Hang && CurrentHangingState != HangingState_NotHanging) { return; }
 	ResetToBasicParkourState();
 }
 
@@ -173,7 +173,7 @@ void UParkourMovementComponent::UpdateEdgeStatuses()
 		//Initialising a variable that refers to the pointer to the aproppriate Enumerator variable depending on the direction;
 		TEnumAsByte<EEdgeState> * TestedEdgeState = &(bTestRight ? RightEdgeState : LeftEdgeState);
 		//If the state of the given edge was already discovered, the current iteration is skipped
-		if (*TestedEdgeState != Unknown) { continue; }
+		if (*TestedEdgeState != EdgeState_Unknown) { continue; }
 	
 		//This float is used to flip a vector left or right depending on which direction is being tested in this iteration
 		float Direction = bTestRight ? 1 : -1;
@@ -194,12 +194,12 @@ void UParkourMovementComponent::UpdateEdgeStatuses()
 		//Checking for an inner corner first, then an inner corner(if the first test failed)
 		if ((TestEdgeForCorner(bTestRight, false, OUT *TestedCornerTargetTransform)) || (TestEdgeForCorner(bTestRight, true, OUT *TestedCornerTargetTransform)))
 		{
-			*TestedEdgeState = Corner;
+			*TestedEdgeState = EdgeState_Corner;
 		}
 		//If the code executed this far and both edge tests returned false, it means the location is not fit for hanging in any way
 		else
 		{
-			*TestedEdgeState = Block;
+			*TestedEdgeState = EdgeState_Block;
 		}
 		
 		//A collider is spawned to the right or left of the player one capsule radius away
@@ -367,13 +367,13 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 	if (bCanHang)
 	{
 		SetParkourState(ParkourState_Hang);
-		ChangeHangingState(AdjustingLocation);
+		ChangeHangingState(HangingState_AdjustingLocation);
 		AdjustHangLocation(HangLocation, HangRotation, LocationAdjustment);
 		return true;
 	}
 	else
 	{
-		ChangeHangingState(NotHanging);
+		ChangeHangingState(HangingState_NotHanging);
 		return false;
 	}
 }
@@ -397,13 +397,13 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 	//If the current state is already equal to the one passed in, an early return is triggered; function execution ceases
 	if (CurrentHangingState == NewHangingState) { return; }
 	
-	//Declaring a bool that tells wherever the new state is the NotHangingState
-	bool bIsNewStateNotHanging = NewHangingState == NotHanging;
+	//Declaring a bool that tells wherever the new state is the HangingState_NotHangingState
+	bool bIsNewStateHangingState_NotHanging = NewHangingState == HangingState_NotHanging;
 	
-	//The delegate is triggered only if the state changed between NotHanging and any other state
-	if ((CurrentHangingState == NotHanging) != bIsNewStateNotHanging)
+	//The delegate is triggered only if the state changed between HangingState_NotHanging and any other state
+	if ((CurrentHangingState == HangingState_NotHanging) != bIsNewStateHangingState_NotHanging)
 	{
-		HangingStateChanged.Broadcast(!bIsNewStateNotHanging);
+		HangingStateChanged.Broadcast(!bIsNewStateHangingState_NotHanging);
 	}
 	
 	FVector TargetLocation;
@@ -414,22 +414,22 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 	
 	//Futher processes are carried out depending on what the new state is
 	switch (CurrentHangingState) {
-	case NotHanging:
+	case HangingState_NotHanging:
 		StartNoHangTimer();
 		TogglePlaneLock(false);
 		SetMovementMode(MOVE_Falling);
 		GravityScale = 1;
 		ResetHangingColliders();
 		break;
-	case AdjustingLocation:
+	case HangingState_AdjustingLocation:
 		GetOwner()->DisableInput(GetWorld()->GetFirstPlayerController());
 		GravityScale = 0;
 		Velocity = FVector(0, 0, 0);
-	case TraversingACorner:
+	case HangingState_TraversingACorner:
 		GetOwner()->SetActorEnableCollision(false);
 		ResetHangingColliders();
 		break;
-	case Hanging:
+	case HangingState_Hanging:
 		TogglePlaneLock(true);
 		GetOwner()->SetActorEnableCollision(true);
 		GetOwner()->EnableInput(GetWorld()->GetFirstPlayerController());
@@ -440,7 +440,7 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 
 void UParkourMovementComponent::AdjustmentEnded()
 {
-	ChangeHangingState(Hanging);
+	ChangeHangingState(HangingState_Hanging);
 }
 
 void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) 
@@ -460,7 +460,7 @@ void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked)
 
 void UParkourMovementComponent::FinishHang()
 {
-	ChangeHangingState(NotHanging);
+	ChangeHangingState(HangingState_NotHanging);
 	ResetToBasicParkourState();
 }
 
@@ -476,7 +476,7 @@ void UParkourMovementComponent::SpawnEdgeCollider(bool bIsRightEdge, FTransform 
 	NewColliderObject->SetRelativeTransform(SpawnTransform);
 	
 	//Either changing the collider to a blocking wall or binding it to EdgeOVerlapBegin depending if it represents and non-traversable edge or a corner transistion respectively
-	if ((bIsRightEdge? RightEdgeState : LeftEdgeState) == Block)
+	if ((bIsRightEdge? RightEdgeState : LeftEdgeState) == EdgeState_Block)
 	{
 		NewColliderObject->SetCollisionProfileName("InvisibleWallDynamic"); NewColliderObject->UpdateCollisionProfile();
 	}
@@ -500,15 +500,15 @@ void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* Over
 	FTransform * TargetTransform = (OverlappedComp == LeftCollider) ? &LeftEdgeTargetTransform : &RightEdgeTargetTransform;
 	
 	//Beginning the transition around a corner
-	ChangeHangingState(TraversingACorner);
+	ChangeHangingState(HangingState_TraversingACorner);
 	AdjustHangLocation(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator(), CornerAdjustment);
 }
 
 void UParkourMovementComponent::ResetHangingColliders()
 {
 	//Setting edge status enums to the default statE
-	LeftEdgeState = Unknown;
-	RightEdgeState = Unknown;
+	LeftEdgeState = EdgeState_Unknown;
+	RightEdgeState = EdgeState_Unknown;
 	
 	//Destroying edge collliders if they exist
 	if (LeftCollider)
@@ -767,7 +767,7 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 		}
 		return false;
 	case ParkourState_Hang: 
-		if (CurrentHangingState != Hanging) { return false; }
+		if (CurrentHangingState != HangingState_Hanging) { return false; }
 		FinishHang();
 		if (GetLastUpdateRotation().Equals(PawnOwner->GetControlRotation(), 90.f))
 		{
