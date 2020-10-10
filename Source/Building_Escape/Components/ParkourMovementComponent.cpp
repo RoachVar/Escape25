@@ -741,31 +741,16 @@ void UParkourMovementComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 
 bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 {
+	if (!CharacterOwner) { return false; }
 	switch (CurrentMovementState) {
 	case ParkourState_Walk:
-		if (CharacterOwner && CharacterOwner->CanJump())
-		{
-			// Don't jump if we can't move up/down.
-			if (!bConstrainToPlane || FMath::Abs(PlaneConstraintNormal.Z) != 1.f)
-			{
-				Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity);
-				SetMovementMode(MOVE_Falling);
-				return true;
-			}
-		}
-		return false;
+		Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity);
+		SetMovementMode(MOVE_Falling);
+		return true;
 	case ParkourState_Crawl:
-		if (CharacterOwner && CharacterOwner->CanJump())
-		{
-			// Don't jump if we can't move up/down.
-			if (!bConstrainToPlane || FMath::Abs(PlaneConstraintNormal.Z) != 1.f)
-			{
-				Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity * 2);
-				SetMovementMode(MOVE_Falling);
-				return true;
-			}
-		}
-		return false;
+		Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity * 2);
+		SetMovementMode(MOVE_Falling);
+		return true;
 	case ParkourState_Hang: 
 		if (CurrentHangingState != HangingState_Hanging) { return false; }
 		FinishHang();
