@@ -79,10 +79,6 @@ public:
 	virtual bool CanCrouchInCurrentState() const override;
 	//END UCharacterMovementComponent Interface
 
-	/*A function that is called when a transition to hanging or across a corner, etc occurs. The default implementation just teleport the player. 
-	The default implementation will be skipped if the delegate that was passed in bound*/
-	void AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate);
-	//If overriding this function, the designer is responsible for calling AdjustmentedEnded() manually
 
 	UFUNCTION(BlueprintPure)
 	TEnumAsByte<EParkourMovementState> GetMovementState();
@@ -142,6 +138,11 @@ private:
 	// This function destroys any spawned colliders and resets the EdgeStatus variables to "Unknown". It is triggering when ceasing to hang altogether or when transitioning to a new plane
 	void ResetHangingColliders();
 
+	/*A function that is called when a transition to hanging or across a corner, etc occurs. The default implementation just teleport the player. 
+	The default implementation will be skipped if the delegate that was passed in bound*/
+	void AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate, TEnumAsByte<EHangingState> NewHangingStateAfterTransition);
+	//If overriding this function, the designer is responsible for calling AdjustmentedEnded() manually
+	
 	// Called when AdjustLocation functions have done their job; If any of them are overriden, it is the designers job to call it after they are finished
 	UFUNCTION(BlueprintCallable)
 	void AdjustmentEnded();
@@ -166,6 +167,10 @@ private:
 
 	UPROPERTY(BlueprintAssignable)
 	FHangingTransitionDelegate ClimbUpAdjustment;
+
+	TEnumAsByte<EHangingState> HangingStateAfterTransition;
+	bool TestForClimbUpLocation(OUT FVector& OutClimbUpLocation);
+	bool AttemptClimbUp();
 //End hang system
 
 	UPROPERTY(BlueprintAssignable)

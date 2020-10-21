@@ -368,7 +368,7 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 	{
 		SetParkourState(ParkourState_Hang);
 		ChangeHangingState(HangingState_AdjustingLocation);
-		AdjustHangLocation(HangLocation, HangRotation, LocationAdjustment);
+		AdjustHangLocation(HangLocation, HangRotation, LocationAdjustment, HangingState_Hanging);
 		return true;
 	}
 	else
@@ -378,8 +378,11 @@ bool UParkourMovementComponent::TryToHangInCurrentLocation()
 	}
 }
 
-void UParkourMovementComponent::AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate)
+void UParkourMovementComponent::AdjustHangLocation(FVector TargetLocation, FRotator TargetRotation, FHangingTransitionDelegate TransitionDelegate, TEnumAsByte<EHangingState> NewHangingStateAfterTransition)
 {
+
+	HangingStateAfterTransition = NewHangingStateAfterTransition;
+
 	if (TransitionDelegate.IsBound())
 	{
 		TransitionDelegate.Broadcast(TargetLocation, TargetRotation);
@@ -440,7 +443,14 @@ void UParkourMovementComponent::ChangeHangingState(TEnumAsByte<EHangingState> Ne
 
 void UParkourMovementComponent::AdjustmentEnded()
 {
-	ChangeHangingState(HangingState_Hanging);
+	if (HangingStateAfterTransition == HangingState_NotHanging)
+		{
+			FinishHang();
+		}
+	else
+		{
+			ChangeHangingState(HangingStateAfterTransition);
+		}
 }
 
 void UParkourMovementComponent::TogglePlaneLock(bool bNewIsLocked) 
@@ -501,7 +511,7 @@ void UParkourMovementComponent::EdgeOverlapBegin(class UPrimitiveComponent* Over
 	
 	//Beginning the transition around a corner
 	ChangeHangingState(HangingState_TraversingACorner);
-	AdjustHangLocation(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator(), CornerAdjustment);
+	AdjustHangLocation(TargetTransform->GetLocation(), TargetTransform->GetRotation().Rotator(), CornerAdjustment, HangingState_Hanging);
 }
 
 void UParkourMovementComponent::ResetHangingColliders()
@@ -742,6 +752,7 @@ void UParkourMovementComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 {
 	if (!CharacterOwner) { return false; }
+	
 	switch (CurrentMovementState) {
 	case ParkourState_Walk:
 		Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity);
@@ -753,15 +764,16 @@ bool UParkourMovementComponent::DoJump(bool bReplayingMoves)
 		return true;
 	case ParkourState_Hang: 
 		if (CurrentHangingState != HangingState_Hanging) { return false; }
-		FinishHang();
 		if (GetLastUpdateRotation().Equals(PawnOwner->GetControlRotation(), 90.f))
 		{
-			Velocity.X = 0;
-			Velocity.Y = 0;
-			Velocity.Z = FMath::Max(Velocity.Z, JumpZVelocity * 1.5f);
+			if (!AttemptClimbUp())
+			{
+				return false;
+			}
 		}
 		else
 		{
+			FinishHang();
 			Lunge();
 		}
 		SetMovementMode(MOVE_Falling);
@@ -824,9 +836,7 @@ bool UParkourMovementComponent::IsMovingOnGround() const
 
 bool UParkourMovementComponent::IsCrouching() const
 {
-	float CurrentHeight = CharacterOwner->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
-	float NormalHeight = CharacterOwner->GetClass()->GetDefaultObject<ACharacter>()->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
-	return abs(CurrentHeight - NormalHeight) > 1;
+	return Super::IsCrouching();
 }
 
 bool UParkourMovementComponent::GetIsTouchingLeftWall()
@@ -842,5 +852,55 @@ bool UParkourMovementComponent::CanCrouchInCurrentState() const
 	}
 
 	return (IsFalling() || (CurrentMovementState != ParkourState_Hang) && (CurrentMovementState != ParkourState_Wallrun) && UpdatedComponent && !UpdatedComponent->IsSimulatingPhysics());
+}
+
+bool UParkourMovementComponent::TestForClimbUpLocation(OUT FVector& OutClimbUpLocation)
+{
+	FHitResult HitResult;
+	FCollisionShape CollisionShape = CharacterOwner->GetCapsuleComponent()->GetCollisionShape();
+	FCollisionQueryParams TraceParams(FName(TEXT("")), false, GetOwner());
+	if (GetWorld()->SweepSingleByChannel(
+		HitResult,
+		LastUpdateLocation,
+		LastUpdateLocation + FVector(0, 0, AttachHeight + CollisionShape.GetCapsuleHalfHeight()),
+		LastUpdateRotation,
+		ECollisionChannel::ECC_Pawn,
+		CollisionShape,
+		TraceParams)
+		)
+	{
+		return false;
+	}
+	
+	FVector PotentialClimbupLocation = LastUpdateLocation + FVector(0, 0, AttachHeight + CollisionShape.GetCapsuleHalfHeight()) + LastUpdateRotation.RotateVector(FVector(2 * CapsuleRadius, 0, 1));
+	if (GetWorld()->SweepSingleByChannel(
+		HitResult,
+		LastUpdateLocation + FVector(0, 0, AttachHeight + CollisionShape.GetCapsuleHalfHeight() + 1),
+		PotentialClimbupLocation,
+		LastUpdateRotation,
+		ECollisionChannel::ECC_Pawn,
+		CollisionShape,
+		TraceParams)
+		)
+	{
+		FString ActorName = HitResult.Actor->GetName();
+		DrawDebugCapsule(GetWorld(), LastUpdateLocation + FVector(0, 0, AttachHeight + CollisionShape.GetCapsuleHalfHeight()), CapsuleHalfHeight, CapsuleRadius, LastUpdateRotation, FColor::Blue, true);
+		DrawDebugCapsule(GetWorld(), LastUpdateLocation + FVector(0, 0, AttachHeight + CollisionShape.GetCapsuleHalfHeight()) + LastUpdateRotation.RotateVector(FVector(2 * CapsuleRadius, 0, 0)), CapsuleHalfHeight, CapsuleRadius, LastUpdateRotation, FColor::Red, true);
+		return false;
+	}
+
+	OutClimbUpLocation = PotentialClimbupLocation;
+	return true;
+}
+
+bool UParkourMovementComponent::AttemptClimbUp()
+{
+	FVector ClimbUpLocation;
+	if (TestForClimbUpLocation(OUT ClimbUpLocation))
+	{
+		AdjustHangLocation(ClimbUpLocation, LastUpdateRotation.Rotator(), ClimbUpAdjustment, HangingState_NotHanging);
+		return true;
+	}
+	return false;
 }
 
